@@ -7,4 +7,3 @@ screeninfo
 numpy
 pillow
 openpyxl
-hgvs

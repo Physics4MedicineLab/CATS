@@ -15,7 +15,6 @@ import pandas as pd
 import requests
 from Bio import SeqIO
 from Bio.Seq import Seq
-import hgvs.parser
 from tqdm import tqdm
 
 # Mapping of IUPAC notation to regex pattern
@@ -36,6 +35,40 @@ IUPAC_MAP = {
     "-": "[-.]"
 }
 
+class Variant:
+    def __init__(self, ac, posedit):
+        self.ac = ac
+        self.posedit = posedit
+        self.position_edit()
+
+    def position_edit(self):
+        pattern = r'^(?P<rpos>\d+(?:_\d+)?)(?P<edit>.*)$'
+        match = re.match(pattern, self.posedit)
+        if not match:
+            raise ValueError("Invalid posedit format")
+        self.rpos = match.group("rpos")
+        self.edit = match.group("edit")
+
+class HGVSParser:
+    def __init__(self):
+        pass
+
+    def parse(self, hgvs_str) -> Variant:
+        """
+        Parse an HGVS string and return a `Variant` object with attributes:
+          - accession (`ac`)
+          - `posedit`: the full edit string (e.g. "100_101delAA")
+          - `rpos`: the (range) position relative to the considered sequence (e.g. "100_101")
+          - `edit`: the mutation description (e.g. "delAA")
+        """
+        self.hgvs_str = hgvs_str
+        pattern = r'^(?P<ac>[A-Z0-9_.]+):[cgmnrp]\.(?P<edit>.+)$'
+        match = re.match(pattern, self.hgvs_str)
+        if not match:
+            raise ValueError("Invalid or unsupported HGVS format")
+        ac = match.group("ac")
+        posedit_str = match.group("edit")
+        return Variant(ac, posedit_str)
 
 def create_sequence_pattern(sequence):
     """
@@ -408,14 +441,14 @@ def check_sequences(seqs: list) -> list:
     return [seq1, seq2]
 
 
-def parse_hgvs_notation(variation_title, start, end, parser):
+def parse_hgvs_notation(variation_title: str, start: int, end: int, parser: HGVSParser):
     """
     Parse the HGVS notation from the variation title.
     """
     try:
-        variant = parser.parse_hgvs_variant(variation_title.split(" ")[0])
+        variant = parser.parse(variation_title.split(" ")[0])
         accession = variant.ac
-        edit = str(variant.posedit.edit)
+        edit = str(variant.edit)
         pos_start = start
         pos_end = end
     except:
@@ -582,7 +615,7 @@ def run_cats(fasta_file,
         pathogenic_variants = None
 
     if apply_variants:
-        hgvs_parser = hgvs.parser.Parser()
+        hgvs_parser = HGVSParser()
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tCreating temporary FASTA file with variants applied.")
         temp_fasta = tempfile.NamedTemporaryFile(mode='w+', delete=False)
         temp_fasta_file = temp_fasta.name
