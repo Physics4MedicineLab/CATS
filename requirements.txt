@@ -1,0 +1,10 @@
+pandas
+biopython
+gffutils
+requests
+ttkbootstrap
+screeninfo
+numpy
+pillow
+openpyxl
+hgvs
