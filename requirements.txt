@@ -7,3 +7,4 @@ screeninfo
 numpy
 pillow
 openpyxl
+Parsley

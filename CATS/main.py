@@ -16,6 +16,7 @@ import requests
 from Bio import SeqIO
 from Bio.Seq import Seq
 from tqdm import tqdm
+from parsley import makeGrammar
 
 # Mapping of IUPAC notation to regex pattern
 IUPAC_MAP = {
@@ -35,40 +36,79 @@ IUPAC_MAP = {
     "-": "[-.]"
 }
 
-class Variant:
-    def __init__(self, ac, posedit):
+class SequenceVariant:
+    """Parsed variant sequence in hgvs format"""
+    def __init__(self, ac, gene, var_type, posedit):
         self.ac = ac
+        self.gene = gene
+        self.var_type = var_type
         self.posedit = posedit
-        self.position_edit()
 
-    def position_edit(self):
-        pattern = r'^(?P<rpos>\d+(?:_\d+)?)(?P<edit>.*)$'
-        match = re.match(pattern, self.posedit)
-        if not match:
-            raise ValueError("Invalid posedit format")
-        self.rpos = match.group("rpos")
-        self.edit = match.group("edit")
+    def __repr__(self):
+        return (f"SequenceVariant(ac={self.ac!r}, gene={self.gene!r}, "
+                f"var_type={self.var_type!r}, posedit={self.posedit!r})")
 
-class HGVSParser:
-    def __init__(self):
-        pass
+class PosEdit:
+    """Position/Edit"""
+    def __init__(self, pos, edit, uncertain=False):
+        self.pos = pos
+        self.edit = edit
+        self.uncertain = uncertain
 
-    def parse(self, hgvs_str) -> Variant:
-        """
-        Parse an HGVS string and return a `Variant` object with attributes:
-          - accession (`ac`)
-          - `posedit`: the full edit string (e.g. "100_101delAA")
-          - `rpos`: the (range) position relative to the considered sequence (e.g. "100_101")
-          - `edit`: the mutation description (e.g. "delAA")
-        """
-        self.hgvs_str = hgvs_str
-        pattern = r'^(?P<ac>[A-Z0-9_.]+):[cgmnrp]\.(?P<edit>.+)$'
-        match = re.match(pattern, self.hgvs_str)
-        if not match:
-            raise ValueError("Invalid or unsupported HGVS format")
-        ac = match.group("ac")
-        posedit_str = match.group("edit")
-        return Variant(ac, posedit_str)
+    def __repr__(self):
+        return (f"PosEdit(pos={self.pos!r}, edit={self.edit!r}, "
+                f"uncertain={self.uncertain!r})")
+
+class NARefAlt:
+    """Nucleic Acid Reference/Alternative"""
+    def __init__(self, ref, alt, mut_type=None):
+        self.ref = ref
+        self.alt = alt
+        self.mut_type = mut_type  # e.g., "substitution", "deletion", etc.
+
+    def __repr__(self):
+        return f"NARefAlt(ref={self.ref!r}, alt={self.alt!r}, mut_type={self.mut_type!r})"
+
+grammar = r"""
+hgvs_variant = accn:ac opt_gene_expr:gene ':' var_type:vt '.' posedit:posedit -> SequenceVariant(ac, gene, vt, posedit)
+
+# Variant type letter (one of c, g, m, n, p, r)
+var_type = <('c'|'g'|'m'|'n'|'p'|'r')>
+
+# Posedit options:
+posedit = substitution | delins | deletion | insertion | duplication
+
+substitution = pos:pos dna_subst:edit -> PosEdit(pos, edit)
+delins       = pos:pos dna_delins:edit -> PosEdit(pos, edit)
+deletion     = pos:pos dna_del:edit   -> PosEdit(pos, edit)
+insertion    = pos:pos dna_ins:edit   -> PosEdit(pos, edit)
+duplication  = pos:pos dna_dup:edit   -> PosEdit(pos, edit)
+
+pos = <digit+>:x -> int(x)
+
+# Nucleic Acid Ref/Alt
+dna_subst  = dna:ref '>' dna:alt    -> NARefAlt(ref, alt, "substitution")
+dna_delins = 'delins' dna_seq:seq    -> NARefAlt(None, seq, "delins")
+dna_del    = 'del' !('ins') (dna_seq:seq | ->None):seq -> NARefAlt(seq, None, "deletion")
+dna_ins    = 'ins' dna_seq:seq       -> NARefAlt(None, seq, "insertion")
+dna_dup    = 'dup' (dna_seq:seq | ->None):seq -> NARefAlt(seq, seq, "duplication")
+
+dna_seq = <(('A'|'C'|'G'|'T'))+>:x -> x
+dna = dna_seq
+
+# Accession
+accn = <letter (letterOrDigit | ('-' | '_'))* ('.' digit+)?>
+
+# Gene (optional)
+opt_gene_expr = (paren_gene | ->None):gene -> gene
+paren_gene = '(' gene_symbol:sym ')' -> sym
+gene_symbol = <letter (letterOrDigit | ('-' | '_'))+>
+
+# Basic Tokens
+digit = :x ?(x in "0123456789")
+letter = :x ?(x.isalpha())
+letterOrDigit = :x ?(x.isalnum())
+"""
 
 def create_sequence_pattern(sequence):
     """
@@ -155,16 +195,18 @@ def extract_transcripts(db):
     """
     transcripts = {}
     for transcript in db.features_of_type('transcript'):
-        transcripts[transcript.id] = {
-            'id': transcript.id,
-            'chrom': transcript.chrom,
-            'start': transcript.start,
-            'end': transcript.end,
-            'strand': transcript.strand,
-            'gene_id': transcript.attributes['gene_id'][0],
-            'gene_name': transcript.attributes.get('gene_name', [None])[0],
-            'transcript_type': transcript.attributes.get('transcript_type', [None])[0]
-        }
+        # TODO: decide if MANE_Select is necessary or not!
+        if "MANE_Select" in transcript.attributes.get('tag', [None]):
+            transcripts[transcript.id] = {
+                'id': transcript.id,
+                'chrom': transcript.chrom,
+                'start': transcript.start,
+                'end': transcript.end,
+                'strand': transcript.strand,
+                'gene_id': transcript.attributes['gene_id'][0],
+                'gene_name': transcript.attributes.get('gene_name', [None])[0],
+                'transcript_type': transcript.attributes.get('transcript_type', [None])[0],
+            }
     return transcripts
 
 
@@ -173,7 +215,8 @@ def process_record_w_transcripts(args):
     Worker function for parallel searches in parse_fasta() when transcripts exist.
     """
     (record, seq1_pattern, seq2_pattern, transcripts,
-     pathogenic_variants, window_size, num_bases, gene_list, single_seq) = args
+     pathogenic_variants, window_size, num_bases, 
+     gene_list, single_seq) = args
 
     result = []
     record_transcript_id = record.id.split('|')[0]
@@ -195,9 +238,9 @@ def process_record_w_transcripts(args):
             base_dict = {
                 "Transcript ID": f"{transcript_parts[0]}|{transcript_parts[1]}",
                 "Gene Name": transcript_parts[5],
-                "Biotype": transcript_parts[7],
+                "Biotype": '|'.join(transcript_parts[7:]),
                 "Strand": record_info["strand"],
-                "Sequence": seq[start_idx:end_idx],
+                "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
                 "Matched seq": match.group(),
                 "Matched seq index": f"{record_info['chrom']}:{record_info['start'] + match.start()}"
             }
@@ -208,10 +251,25 @@ def process_record_w_transcripts(args):
                     for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
                         seq_region_start = record_info['start'] + start_idx
                         seq_region_end = record_info['start'] + end_idx
+
+                        region_start = record_info['start'] + match.start()
+                        region_end = region_start + len(match.group())
+
+                        if var_start >= region_start and var_stop <= region_end:
+                            var_distance = 0
+                        else:
+                            var_distance = min([
+                                abs(region_start - var_start),
+                                abs(region_end - var_start),
+                                abs(region_start - var_stop),
+                                abs(region_end - var_stop),
+                            ])
+
                         if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                             variant_dict = base_dict.copy()
                             variant_dict.update({
                                 "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
+                                "Variant distance": var_distance,
                                 "Variant name": var_title
                             })
                             result.append(variant_dict)
@@ -228,9 +286,9 @@ def process_record_w_transcripts(args):
                 base_dict = {
                     "Transcript ID": f"{transcript_parts[0]}|{transcript_parts[1]}",
                     "Gene Name": transcript_parts[5],
-                    "Biotype": transcript_parts[7],
+                    "Biotype": '|'.join(transcript_parts[7:]),
                     "Strand": record_info["strand"],
-                    "Sequence": seq[start_idx:end_idx],
+                    "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
                     "First seq": idx1.group(),
                     "First seq index": f"{record_info['chrom']}:{record_info['start'] + idx1.start()}",
                     "Second seq": idx2.group(),
@@ -243,10 +301,31 @@ def process_record_w_transcripts(args):
                         for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
                             seq_region_start = record_info['start'] + start_idx
                             seq_region_end = record_info['start'] + end_idx
+
+                            region1_start = record_info['start'] + idx1.start()
+                            region1_end = region1_start + len(idx1.group())
+                            region2_start = record_info['start'] + idx2.start()
+                            region2_end = region2_start + len(idx2.group())
+
+                            if (var_start >= region1_start and var_stop <= region1_end) or (var_start >= region2_start and var_stop <= region2_end):
+                                var_distance = 0
+                            else:
+                                var_distance = min([
+                                    abs(region1_start - var_start),
+                                    abs(region1_end - var_start),
+                                    abs(region2_start - var_start),
+                                    abs(region2_end - var_start),
+                                    abs(region1_start - var_stop),
+                                    abs(region1_end - var_stop),
+                                    abs(region2_start - var_stop),
+                                    abs(region2_end - var_stop),
+                                ])
+
                             if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                                 variant_dict = base_dict.copy()
                                 variant_dict.update({
                                     "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
+                                    "Variant distance": var_distance,
                                     "Variant name": var_title
                                 })
                                 result.append(variant_dict)
@@ -258,7 +337,8 @@ def process_record_w_transcripts_pc(args):
     Worker function for parallel searches in parse_fasta() for protein-coding transcripts.
     """
     (record, seq1_pattern, seq2_pattern, transcripts,
-     pathogenic_variants, window_size, num_bases, gene_list, single_seq) = args
+     pathogenic_variants, window_size, num_bases, 
+     gene_list, single_seq) = args
 
     result = []
     record_transcript_id = record.id.split('|')[0]
@@ -281,7 +361,7 @@ def process_record_w_transcripts_pc(args):
                 "Gene Name": transcript_parts[5],
                 "Regions": '|'.join(transcript_parts[7:]),
                 "Strand": record_info["strand"],
-                "Sequence": seq[start_idx:end_idx],
+                "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
                 "Matched seq": match.group(),
                 "Matched seq index": f"{record_info['chrom']}:{record_info['start'] + match.start()}"
             }
@@ -292,10 +372,25 @@ def process_record_w_transcripts_pc(args):
                     for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
                         seq_region_start = record_info['start'] + start_idx
                         seq_region_end = record_info['start'] + end_idx
+
+                        region_start = record_info['start'] + match.start()
+                        region_end = region_start + len(match.group())
+
+                        if var_start >= region_start and var_stop <= region_end:
+                            var_distance = 0
+                        else:
+                            var_distance = min([
+                                abs(region_start - var_start),
+                                abs(region_end - var_start),
+                                abs(region_start - var_stop),
+                                abs(region_end - var_stop),
+                            ])
+
                         if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                             variant_dict = base_dict.copy()
                             variant_dict.update({
                                 "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
+                                "Variant distance": var_distance,
                                 "Variant name": var_title
                             })
                             result.append(variant_dict)
@@ -313,7 +408,7 @@ def process_record_w_transcripts_pc(args):
                     "Gene Name": transcript_parts[5],
                     "Regions": '|'.join(transcript_parts[7:]),
                     "Strand": record_info["strand"],
-                    "Sequence": seq[start_idx:end_idx],
+                    "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
                     "First seq": idx1.group(),
                     "First seq index": f"{record_info['chrom']}:{record_info['start'] + idx1.start()}",
                     "Second seq": idx2.group(),
@@ -326,10 +421,31 @@ def process_record_w_transcripts_pc(args):
                         for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
                             seq_region_start = record_info['start'] + start_idx
                             seq_region_end = record_info['start'] + end_idx
+
+                            region1_start = record_info['start'] + idx1.start()
+                            region1_end = region1_start + len(idx1.group())
+                            region2_start = record_info['start'] + idx2.start()
+                            region2_end = region2_start + len(idx2.group())
+
+                            if (var_start >= region1_start and var_stop <= region1_end) or (var_start >= region2_start and var_stop <= region2_end):
+                                var_distance = 0
+                            else:
+                                var_distance = min([
+                                    abs(region1_start - var_start),
+                                    abs(region1_end - var_start),
+                                    abs(region2_start - var_start),
+                                    abs(region2_end - var_start),
+                                    abs(region1_start - var_stop),
+                                    abs(region1_end - var_stop),
+                                    abs(region2_start - var_stop),
+                                    abs(region2_end - var_stop),
+                                ])
+
                             if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                                 variant_dict = base_dict.copy()
                                 variant_dict.update({
                                     "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
+                                    "Variant distance": var_distance,
                                     "Variant name": var_title
                                 })
                                 result.append(variant_dict)
@@ -341,7 +457,8 @@ def process_record_no_transcripts(args):
     Worker function for parallel searches in parse_fasta() when no transcripts exist.
     """
     (record, seq1_pattern, seq2_pattern, transcripts,
-     pathogenic_variants, window_size, num_bases, gene_list, single_seq) = args
+     pathogenic_variants, window_size, num_bases, 
+     gene_list, single_seq) = args
 
     result = []
     seq = str(record.seq)
@@ -441,40 +558,23 @@ def check_sequences(seqs: list) -> list:
     return [seq1, seq2]
 
 
-def parse_hgvs_notation(variation_title: str, start: int, end: int, parser: HGVSParser):
+def parse_hgvs_notation(variation_title: str, start: int, end: int, parser):
     """
     Parse the HGVS notation from the variation title.
     """
     try:
-        variant = parser.parse(variation_title.split(" ")[0])
+        variant: SequenceVariant = parser(variation_title.split(" ")[0]).hgvs_variant()
         accession = variant.ac
-        edit = str(variant.edit)
+        edit = variant.posedit.edit
+        mut_type = variant.posedit.edit.mut_type
         pos_start = start
         pos_end = end
+        ref, alt = edit.ref, edit.alt
     except:
         return None
 
-    if '>' in edit:
-        mutation_type = 'substitution'
-        ref, alt = edit.split('>')
-    elif 'delins' in edit:
-        mutation_type = 'indel'
-        alt = edit[6:]
-    elif 'del' in edit:
-        mutation_type = 'deletion'
-        alt = ''
-    elif 'ins' in edit:
-        mutation_type = 'insertion'
-        alt = edit[3:]
-    elif 'dup' in edit:
-        mutation_type = 'duplication'
-        alt = None
-    else:
-        mutation_type = 'unknown'
-        alt = None
-
     return {
-        'mutation_type': mutation_type,
+        'mutation_type': mut_type,
         'pos_start': pos_start,
         'pos_end': pos_end,
         'change': edit,
@@ -502,7 +602,7 @@ def apply_variant_to_sequence(transcript_seq, transcript_begin, variant_info):
         seq.insert(idx, alt)
     elif mutation_type == 'duplication':
         seq.insert(idx + 1, seq[idx])
-    elif mutation_type == 'indel':
+    elif mutation_type == 'delins':
         del seq[idx:pos_end]
         seq.insert(idx, alt)
     else:
@@ -520,7 +620,8 @@ def run_cats(fasta_file,
              pathogenicity=False,
              snv=False,
              gene_list=None,
-             apply_variants=False):
+             apply_variants=False,
+             variant_window=None):
     """
     Main analysis function.
     """
@@ -540,6 +641,7 @@ def run_cats(fasta_file,
 
     snv = bool(snv)
     pathogenic = pathogenicity or snv or apply_variants
+    variant_window = variant_window or num_bases
 
     if gene_list:
         if os.path.isfile(gene_list):
@@ -615,7 +717,7 @@ def run_cats(fasta_file,
         pathogenic_variants = None
 
     if apply_variants:
-        hgvs_parser = HGVSParser()
+        hgvs_parser = makeGrammar(grammar, globals())
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tCreating temporary FASTA file with variants applied.")
         temp_fasta = tempfile.NamedTemporaryFile(mode='w+', delete=False)
         temp_fasta_file = temp_fasta.name
@@ -680,8 +782,12 @@ def run_cats(fasta_file,
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: WARNING\tNo matching sequences found.")
     else:
         res = pd.DataFrame(result_sequences).drop_duplicates()
-        if apply_variants:
+        if apply_variants and "Regions" in res.columns:
             res = res[res.apply(lambda row: row["Variant name"].split(" ")[0] in row["Regions"], axis=1)]
+        if apply_variants and "Biotype" in res.columns:
+            res = res[res.apply(lambda row: row["Variant name"].split(" ")[0] in row["Biotype"], axis=1)]
+        if variant_window != num_bases:
+            res = res[res["Variant distance"] <= variant_window]
         os.makedirs(os.path.dirname(output), exist_ok=True)
         if ext == ".csv":
             res.to_csv(output, index=False)
@@ -701,9 +807,9 @@ def main():
         description="Parse a FASTA file and find sequences containing one (or two) specified sequences of interest."
     )
     parser.add_argument("--fasta", "-f", dest="fasta_file", required=True,
-                        help="Path to the FASTA file or use 'human', 'mouse', 'human_pc' or 'mouse_pc' keyword to access corresponding transcripts")
+                        help="Path to the FASTA file or use 'human', 'mouse', 'human_pc' or 'mouse_pc' keyword to access corresponding transcripts.")
     parser.add_argument("--seq1", "-1", dest="seq1", required=True,
-                        help="First sequence of interest")
+                        help="First sequence of interest.")
     parser.add_argument("--seq2", "-2", dest="seq2", required=False,
                         help="(Optional) Second sequence of interest. If omitted, only seq1 will be searched.")
     parser.add_argument("--output", "-o", dest="output", required=True,
@@ -723,6 +829,8 @@ def main():
                               "OR a semicolon-separated list of gene names (e.g. 'HBB;HTT')."))
     parser.add_argument("--apply-variants", "-av", dest="apply_variants", action='store_true',
                         help="If set, creates a temporary FASTA file with sequences modified according to the variants. Implies --pathogenicity.")
+    parser.add_argument("--variant-window", "-vw", dest="variant_window", required=False, type=int,
+                        help="Maximum distance between the mutation and the found PAM sequence. Implies --apply-variants.")
     args = parser.parse_args()
 
     run_cats(
@@ -736,7 +844,8 @@ def main():
         pathogenicity=args.pathogenicity,
         snv=args.snv,
         gene_list=args.gene_list,
-        apply_variants=args.apply_variants
+        apply_variants=args.apply_variants,
+        variant_window=args.variant_window,
     )
 
 if __name__ == "__main__":

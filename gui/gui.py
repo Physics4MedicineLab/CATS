@@ -2,8 +2,8 @@ import os
 import sys
 import re
 import threading
-from tkinter import filedialog, messagebox
 import platform
+from tkinter import filedialog, messagebox
 import subprocess
 import webbrowser
 
@@ -47,6 +47,7 @@ class TextRedirector:
     def flush(self):
         pass
 
+
 def main():
     ICON_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "logo.png")
 
@@ -55,47 +56,30 @@ def main():
         entry.delete(0, END)
         entry.insert(0, filename)
 
-    # CHANGED: For browsing an output folder only
     def browse_folder(entry):
         foldername = filedialog.askdirectory()
         if foldername:
             entry.delete(0, END)
             entry.insert(0, foldername)
 
-    def stop_script():
-        """
-        (If you were using subprocesses, you could terminate here. 
-         In this code, we just reset the UI.)
-        """
-        global process
-        if process:
-            process.terminate()
-            process = None
-            run_button.config(text="Run", style="run.TButton")
-            status_label.config(text="", foreground="red")
-            status_label.grid_remove()
-
     def run_script():
         """
-        Start the script (or stop if already running).
+        Start the analysis by calling the updated run_cats function.
+        Note: Stop functionality has been removed because run_cats is not run as an external subprocess.
         """
-        global process
-        if run_button.cget("text") == "Stop":
-            stop_script()
-            return
-
-        # Clear the output text box
+        # Disable the Run button to avoid multiple clicks
+        run_button.config(state='disabled')
+        
+        # Clear the output text box and reset progress bar
         output_text.configure(state='normal')
         output_text.delete('1.0', END)
         output_text.configure(state='disabled')
-        progress_bar["value"] = 0  # reset progress bar
+        progress_bar["value"] = 0
 
         # Update status
         status_label.config(text="Running...", foreground="red")
         status_label.grid()
-        run_button.config(text="Stop", style="stop.TButton")
 
-        # Gather all parameters
         fasta_selection = fasta_combobox.get().strip()
         if fasta_selection == "CUSTOM":
             fasta = fasta_entry.get().strip()
@@ -106,7 +90,7 @@ def main():
         seq2 = seq2_entry.get()
         gtf = gtf_entry.get()
 
-        # CHANGED: Build the output path from (folder + filename + extension)
+        # Build output path from folder, filename, and extension
         output_folder = output_folder_entry.get().strip()
         file_name = output_filename_entry.get().strip()
         extension = extension_var.get().strip()
@@ -114,25 +98,49 @@ def main():
             messagebox.showerror("Error", "Please select an output folder.")
             status_label.config(text="", foreground="red")
             status_label.grid_remove()
-            run_button.config(text="Run", style="run.TButton")
+            run_button.config(state='normal')
             return
         if not file_name:
             messagebox.showerror("Error", "Please specify a file name (without extension).")
             status_label.config(text="", foreground="red")
             status_label.grid_remove()
-            run_button.config(text="Run", style="run.TButton")
+            run_button.config(state='normal')
             return
         if extension not in ["csv", "tsv"]:
             messagebox.showerror("Error", "Please select a valid extension: csv, tsv.")
             status_label.config(text="", foreground="red")
             status_label.grid_remove()
-            run_button.config(text="Run", style="run.TButton")
+            run_button.config(state='normal')
             return
 
         final_output = os.path.join(output_folder, f"{file_name}.{extension}")
 
-        window_size = window_size_entry.get() or 5
-        num_bases = num_bases_entry.get() or 25
+        # Get numeric parameters and convert to int if provided
+        try:
+            window_size_val = int(window_size_entry.get() or 5)
+        except ValueError:
+            messagebox.showerror("Error", "Window Size must be an integer.")
+            run_button.config(state='normal')
+            return
+
+        try:
+            num_bases_val = int(num_bases_entry.get() or 25)
+        except ValueError:
+            messagebox.showerror("Error", "Num Bases must be an integer.")
+            run_button.config(state='normal')
+            return
+
+        variant_window_str = variant_window_entry.get().strip()
+        if variant_window_str:
+            try:
+                variant_window_val = int(variant_window_str)
+            except ValueError:
+                messagebox.showerror("Error", "Variant Window must be an integer.")
+                run_button.config(state='normal')
+                return
+        else:
+            variant_window_val = None  # Will default to num_bases inside run_cats
+
         pathogenicity = pathogenicity_var.get()
         snv = snv_var.get()
         gene_list = gene_list_entry.get()
@@ -153,12 +161,13 @@ def main():
                     seq2=seq2,
                     gtf_file=gtf,
                     output=final_output,
-                    window_size=int(window_size),
-                    num_bases=int(num_bases),
+                    window_size=window_size_val,
+                    num_bases=num_bases_val,
                     pathogenicity=pathogenicity,
                     snv=snv,
                     gene_list=gene_list,
                     apply_variants=apply_variants,
+                    variant_window=variant_window_val,
                     progress_callback=progress_callback
                 )
                 messagebox.showinfo("Success", "Script ran successfully!")
@@ -167,14 +176,14 @@ def main():
             finally:
                 status_label.config(text="", foreground="red")
                 status_label.grid_remove()
-                run_button.config(text="Run", style="run.TButton")
+                run_button.config(state='normal')
                 root.after(0, update_progress, 0, 1)  # reset the progress bar
 
         threading.Thread(target=run_in_thread).start()
 
     def update_fields(event):
         """
-        Automatically populate or hide fields based on the dropdown selection.
+        Automatically update or hide fields based on the FASTA dropdown selection.
         """
         selection = fasta_combobox.get().strip()
         if selection == "HUMAN":
@@ -212,7 +221,7 @@ def main():
         if snv_var.get() or apply_variants_var.get():
             pathogenicity_var.set(True)
 
-    root = ttk.Window(themename="cosmo", iconphoto=ICON_FILE) # superhero, cosmo, simplex
+    root = ttk.Window(themename="cosmo", iconphoto=ICON_FILE)
     root.title("Comparing Cas Activities by Target Superimposition (CATS)")
 
     if platform.system() == "Windows":
@@ -221,15 +230,15 @@ def main():
 
     root.tk.call('tk', 'scaling', 1.4)
 
-    root.geometry("1260x870")
-    root.minsize(1260, 870)
+    root.geometry("1260x920")
+    root.minsize(1260, 920)
 
     root.grid_rowconfigure(0, weight=0)
     root.grid_rowconfigure(1, weight=1)
     for c in range(4):
         root.grid_columnconfigure(c, weight=1)
 
-    FONT = "Helvetica" # Avantgarde, Helvetica
+    FONT = "Helvetica"
     font_large = (FONT, 17)
     font_medium = (FONT, 15)
 
@@ -238,15 +247,11 @@ def main():
 
     s2 = ttk.Style()
     s2.configure('run.TButton', font=(FONT, 13), background='green', foreground='white')
-    s2.map('run.TButton',
+    s2.map(
+        'run.TButton',
         background=[('active', 'lightgreen'), ('!active', 'green')],
-        foreground=[('active', 'white'), ('!active', 'white')])
-
-    s3 = ttk.Style()
-    s3.configure('stop.TButton', font=(FONT, 13), background='red', foreground='white')
-    s3.map('stop.TButton',
-        background=[('active', 'lightcoral'), ('!active', 'red')],
-        foreground=[('active', 'white'), ('!active', 'white')])
+        foreground=[('active', 'white'), ('!active', 'white')]
+    )
 
     s4 = ttk.Style()
     s4.configure('general.success.TCheckbutton', font=font_large, indicatorsize=20)
@@ -254,41 +259,29 @@ def main():
     s5 = ttk.Style()
     s5.configure('general.TCombobox', font=(FONT, 17, "bold"), background='white')
 
-    s.configure(
-        'Banner.TLabel',
-        font=(FONT, 24, "bold"),
-        foreground='blue'
-    )
+    s.configure('Banner.TLabel', font=(FONT, 24, "bold"), foreground='blue')
 
-    # Make Combobox dropdown items larger
     root.option_add('*TCombobox*Listbox.font', font_medium)
 
     banner_frame = ttk.Frame(root, padding=(10, 10, 10, 10))
     banner_frame.grid(row=0, column=0, columnspan=4, sticky="nswe")
-
-    s.configure('Banner.TFrame')
     banner_frame.config(style='Banner.TFrame')
 
-    # Load and Resize the Image (using Pillow)
     original_image = Image.open(ICON_FILE)
     scale_factor = 0.10
     width, height = original_image.size
-    resized_image = original_image.resize(
-        (int(width * scale_factor), int(height * scale_factor)),
-        Image.Resampling.LANCZOS
-    )
+    resized_image = original_image.resize((int(width * scale_factor), int(height * scale_factor)),
+                                           Image.Resampling.LANCZOS)
     cat_image = ImageTk.PhotoImage(resized_image)
 
-    banner_label = ttk.Label(
-        banner_frame,
-        text="    Welcome to CATS",
-        style='Banner.TLabel',
-        image=cat_image,
-        compound='left',  # Place the image to the left of the text
-        padding=5
-    )
+    banner_label = ttk.Label(banner_frame,
+                             text="    Welcome to CATS",
+                             style='Banner.TLabel',
+                             image=cat_image,
+                             compound='left',
+                             padding=5)
     banner_label.image = cat_image
-    banner_label.pack(fill=X)
+    banner_label.pack(fill="x")
 
     notebook = ttk.Notebook(root, bootstyle="secondary")
     notebook.grid(row=1, column=0, columnspan=4, sticky="nsew", padx=10, pady=10)
@@ -301,11 +294,6 @@ def main():
     notebook.add(logging_frame, text=" Logging ")
     notebook.add(docs_frame, text=" Docs ")
 
-    docs_frame.grid_rowconfigure(0, weight=0)
-    docs_frame.grid_rowconfigure(1, weight=1)
-    docs_frame.grid_rowconfigure(2, weight=0)
-    docs_frame.grid_columnconfigure(0, weight=1)
-
     docs_title = ttk.Label(
         docs_frame,
         text="Comparing Cas Activities by Target Superimposition (CATS)",
@@ -315,9 +303,8 @@ def main():
 
     docs_text = ttk.Text(docs_frame, wrap="word", font=font_medium)
     docs_text.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
-
     docs_text.insert("end", "CATS is a bioinformatic tool designed to find genomic regions nearby two distinct sequences of interest.\n\n")
-    docs_text.insert("end", "Please refer to the complete documentation on GitHub. ")
+    docs_text.insert("end", "Please refer to the complete documentation on GitHub.")
     docs_text.configure(state="disabled")
 
     for i in range(12):
@@ -356,7 +343,8 @@ def main():
     gtf_entry = ttk.Entry(genome_frame, textvariable=gtf_var, font=font_large, width=50)
     gtf_entry.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
     gtf_browse_button = ttk.Button(
-        genome_frame, text="Browse",
+        genome_frame,
+        text="Browse",
         command=lambda: browse_file(gtf_entry),
         style='general.TButton'
     )
@@ -381,23 +369,20 @@ def main():
     param_frame = ttk.Labelframe(input_frame, text="  Parameters  ", bootstyle="primary")
     param_frame.grid(row=2, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
 
-    # Row 0: Output folder, browse
     output_folder_var = ttk.StringVar()
     output_folder_label = ttk.Label(param_frame, text="Output Folder:", font=font_large)
     output_folder_label.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
     output_folder_entry = ttk.Entry(param_frame, textvariable=output_folder_var, font=font_large, width=40)
     output_folder_entry.grid(row=0, column=1, sticky="nsew", padx=5, pady=5, columnspan=2)
-
     output_folder_browse = ttk.Button(
-        param_frame, 
-        text="Browse", 
-        command=lambda: browse_folder(output_folder_entry), 
+        param_frame,
+        text="Browse",
+        command=lambda: browse_folder(output_folder_entry),
         style='general.TButton'
     )
     output_folder_browse.grid(row=0, column=3, padx=5, pady=5)
 
-    # Row 1: Filename, extension
     output_filename_var = ttk.StringVar()
     output_filename_label = ttk.Label(param_frame, text="Filename:", font=font_large)
     output_filename_label.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
@@ -408,7 +393,6 @@ def main():
     extension_var = ttk.StringVar()
     extension_label = ttk.Label(param_frame, text="Extension:", font=font_large)
     extension_label.grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
-
     extension_combobox = ttk.Combobox(
         param_frame,
         textvariable=extension_var,
@@ -418,7 +402,7 @@ def main():
         state="readonly",
         style='general.TCombobox'
     )
-    extension_combobox.set("csv")  # default
+    extension_combobox.set("csv")
     extension_combobox.grid(row=1, column=3, sticky="w", padx=5, pady=5)
 
     window_size_var = ttk.StringVar()
@@ -427,13 +411,21 @@ def main():
     window_size_entry = create_labeled_entry(param_frame, "Window Size (default 5):", 2, 0, window_size_var)
     num_bases_entry = create_labeled_entry(param_frame, "Num Bases (default 25):", 3, 0, num_bases_var)
 
+    variant_window_var = ttk.StringVar()
+    variant_window_entry = create_labeled_entry(param_frame, "Variant Window:", 4, 0, variant_window_var)
+
     gene_list_var = ttk.StringVar()
     gene_list_label = ttk.Label(param_frame, text="Gene List:", font=font_large)
-    gene_list_label.grid(row=4, column=0, sticky="nsew", padx=5, pady=5)
+    gene_list_label.grid(row=5, column=0, sticky="nsew", padx=5, pady=5)
     gene_list_entry = ttk.Entry(param_frame, textvariable=gene_list_var, font=font_large, width=50)
-    gene_list_entry.grid(row=4, column=1, sticky="nsew", padx=5, pady=5)
-    gene_list_browse = ttk.Button(param_frame, text="Browse", command=lambda: browse_file(gene_list_entry), style='general.TButton')
-    gene_list_browse.grid(row=4, column=2, padx=5, pady=5)
+    gene_list_entry.grid(row=5, column=1, sticky="nsew", padx=5, pady=5)
+    gene_list_browse = ttk.Button(
+        param_frame,
+        text="Browse",
+        command=lambda: browse_file(gene_list_entry),
+        style='general.TButton'
+    )
+    gene_list_browse.grid(row=5, column=2, padx=5, pady=5)
 
     flag_frame = ttk.Labelframe(input_frame, text="  Flags - Human only  ", bootstyle="primary")
     flag_frame.grid(row=3, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
@@ -446,18 +438,18 @@ def main():
     snv_var.trace_add("write", update_pathogenicity)
     apply_variants_var.trace_add("write", update_pathogenicity)
 
-    pathogenicity_checkbox = ttk.Checkbutton(flag_frame, text="Pathogenic", variable=pathogenicity_var, style="general.success.TCheckbutton")
+    pathogenicity_checkbox = ttk.Checkbutton(flag_frame, text="Pathogenic", variable=pathogenicity_var,
+                                               style="general.success.TCheckbutton")
     pathogenicity_checkbox.grid(row=0, column=0, padx=20, pady=5, sticky="nsew")
 
     snv_checkbox = ttk.Checkbutton(flag_frame, text="SNVs", variable=snv_var, style="general.success.TCheckbutton")
     snv_checkbox.grid(row=0, column=1, padx=20, pady=5, sticky="nsew")
-
-    apply_variants_checkbox = ttk.Checkbutton(flag_frame, text="Apply Variants", variable=apply_variants_var, style="general.success.TCheckbutton")
+    apply_variants_checkbox = ttk.Checkbutton(flag_frame, text="Apply Variants", variable=apply_variants_var,
+                                                style="general.success.TCheckbutton")
     apply_variants_checkbox.grid(row=0, column=2, padx=20, pady=5, sticky="nsew")
 
     button_frame = ttk.Frame(input_frame)
-    button_frame.grid(row=4, column=0, columnspan=4, sticky="nsew", padx=5, pady=20)
-
+    button_frame.grid(row=6, column=0, columnspan=4, sticky="nsew", padx=5, pady=20)
     run_button = ttk.Button(button_frame, text="Run", command=run_script, style='run.TButton')
     run_button.grid(row=0, column=0, padx=10)
 
@@ -474,7 +466,7 @@ def main():
 
     progress_bar = ttk.Progressbar(logging_frame, orient="horizontal", mode="determinate")
     progress_bar.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
-    progress_bar["maximum"] = 100  # percentage mode
+    progress_bar["maximum"] = 100
 
     output_text.tag_configure("info", foreground="orange")
     output_text.tag_configure("warning", foreground="red")
