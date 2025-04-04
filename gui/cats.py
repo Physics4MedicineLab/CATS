@@ -72,10 +72,10 @@ class NARefAlt:
 grammar = r"""
 hgvs_variant = accn:ac opt_gene_expr:gene ':' var_type:vt '.' posedit:posedit -> SequenceVariant(ac, gene, vt, posedit)
 
-# Variant type letter (one of c, g, m, n, p, r)
+# Variant type letter
 var_type = <('c'|'g'|'m'|'n'|'p'|'r')>
 
-# Posedit options:
+# Posedit options
 posedit = substitution | delins | deletion | insertion | duplication
 
 substitution = pos:pos dna_subst:edit -> PosEdit(pos, edit)
@@ -99,7 +99,7 @@ dna = dna_seq
 # Accession
 accn = <letter (letterOrDigit | ('-' | '_'))* ('.' digit+)?>
 
-# Gene (optional)
+# Gene
 opt_gene_expr = (paren_gene | ->None):gene -> gene
 paren_gene = '(' gene_symbol:sym ')' -> sym
 gene_symbol = <letter (letterOrDigit | ('-' | '_'))+>
@@ -195,7 +195,6 @@ def extract_transcripts(db):
     """
     transcripts = {}
     for transcript in db.features_of_type('transcript'):
-        # TODO: decide if MANE_Select is necessary or not!
         if "MANE_Select" in transcript.attributes.get('tag', [None]):
             transcripts[transcript.id] = {
                 'id': transcript.id,
@@ -263,7 +262,7 @@ def process_record_w_transcripts(args):
                                 abs(region_end - var_start),
                                 abs(region_start - var_stop),
                                 abs(region_end - var_stop),
-                            ])
+                            ]) + 1
 
                         if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                             variant_dict = base_dict.copy()
@@ -319,7 +318,7 @@ def process_record_w_transcripts(args):
                                     abs(region1_end - var_stop),
                                     abs(region2_start - var_stop),
                                     abs(region2_end - var_stop),
-                                ])
+                                ]) + 1
 
                             if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                                 variant_dict = base_dict.copy()
@@ -384,7 +383,7 @@ def process_record_w_transcripts_pc(args):
                                 abs(region_end - var_start),
                                 abs(region_start - var_stop),
                                 abs(region_end - var_stop),
-                            ])
+                            ]) + 1
 
                         if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                             variant_dict = base_dict.copy()
@@ -439,7 +438,7 @@ def process_record_w_transcripts_pc(args):
                                     abs(region1_end - var_stop),
                                     abs(region2_start - var_stop),
                                     abs(region2_end - var_stop),
-                                ])
+                                ]) + 1
 
                             if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                                 variant_dict = base_dict.copy()
@@ -624,7 +623,6 @@ def run_cats(fasta_file,
              pathogenicity=False,
              snv=False,
              gene_list=None,
-             apply_variants=False,
              variant_window=None,
              progress_callback=None):
     """
@@ -645,7 +643,7 @@ def run_cats(fasta_file,
         window_size = max(window_size, len(seq1), len(seq2))
 
     snv = bool(snv)
-    pathogenic = pathogenicity or snv or apply_variants
+    pathogenic = pathogenicity or snv
     variant_window = variant_window or num_bases
 
     if gene_list:
@@ -656,8 +654,6 @@ def run_cats(fasta_file,
             gene_list = {g.strip() for g in gene_list.split(';') if g.strip()}
     else:
         gene_list = None
-
-    print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tParameters: window_size={window_size}, num_bases={num_bases}, pathogenicity={pathogenic}, snv={snv}.")
 
     gtf_dbfn = None
     if fasta_file == "human":
@@ -709,7 +705,6 @@ def run_cats(fasta_file,
         transcripts = extract_transcripts(gtf_db)
     else:
         pathogenic = False
-        apply_variants = False
         temp_fasta_file = fasta_file
         gtf_db = None
         gene_list = None
@@ -721,7 +716,7 @@ def run_cats(fasta_file,
     else:
         pathogenic_variants = None
 
-    if apply_variants:
+    if pathogenic:
         hgvs_parser = makeGrammar(grammar, globals())
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tCreating temporary FASTA file with variants applied.")
         temp_fasta = tempfile.NamedTemporaryFile(mode='w+', delete=False)
@@ -788,20 +783,35 @@ def run_cats(fasta_file,
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: WARNING\tNo matching sequences found.")
     else:
         res = pd.DataFrame(result_sequences).drop_duplicates()
-        if apply_variants and "Regions" in res.columns:
+        if pathogenic and "Regions" in res.columns:
             res = res[res.apply(lambda row: row["Variant name"].split(" ")[0] in row["Regions"], axis=1)]
-        if apply_variants and "Biotype" in res.columns:
+        if pathogenic and "Biotype" in res.columns:
             res = res[res.apply(lambda row: row["Variant name"].split(" ")[0] in row["Biotype"], axis=1)]
         if variant_window != num_bases:
             res = res[res["Variant distance"] <= variant_window]
         os.makedirs(os.path.dirname(output), exist_ok=True)
+        with open(output, 'w') as f:
+            f.write("# Used settings:\n")
+            f.write(f"#\tFASTA:          {fasta_file}\n")
+            f.write(f"#\tSeq1:           {seq1}\n")
+            if seq2:
+                f.write(f"#\tSeq2:           {seq2}\n")
+            f.write(f"#\tWindow size:    {window_size}\n")
+            f.write(f"#\tNum. bases:     {num_bases}\n")
+            f.write(f"#\tPathogenicity:  {pathogenic}\n")
+            f.write(f"#\tSNV:            {snv}\n")
+            if gene_list:
+                f.write(f"#\tGene(s):        {gene_list}\n")
+            if pathogenic:
+                f.write(f"#\tVariant window: {variant_window}\n")
+
         if ext == ".csv":
-            res.to_csv(output, index=False)
+            res.to_csv(output, mode="a", index=False)
         elif ext == ".tsv":
-            res.to_csv(output, index=False, sep="\t")
+            res.to_csv(output, mode="a", index=False, sep="\t")
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tResults saved in {output}.")
 
-    if apply_variants or gene_list is not None:
+    if pathogenic or gene_list is not None:
         try:
             os.remove(temp_fasta_file)
         except Exception:
