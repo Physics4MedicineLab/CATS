@@ -49,16 +49,16 @@ CATS --help
 
 which will show this message:
 ```
-usage: CATS [-h] --fasta FASTA_FILE --seq1 SEQ1 [--seq2 SEQ2] --output OUTPUT [--window-size WINDOW_SIZE] [--num-bases NUM_BASES] [--gtf GTF_FILE] [--pathogenicity] [--single-nucleotide-variant]
-            [--gene-list GENE_LIST] [--apply-variants]
+usage: CATS [-h] --fasta FASTA_FILE --seq1 SEQ1 [--seq2 SEQ2] --output OUTPUT [--window-size WINDOW_SIZE] [--num-bases NUM_BASES] [--gtf GTF_FILE] [--pathogenicity]
+            [--single-nucleotide-variant] [--gene-list GENE_LIST] [--variant-window VARIANT_WINDOW]
 
 Parse a FASTA file and find sequences containing one (or two) specified sequences of interest.
 
 optional arguments:
   -h, --help            show this help message and exit
   --fasta FASTA_FILE, -f FASTA_FILE
-                        Path to the FASTA file or use 'human', 'mouse', 'human_pc' or 'mouse_pc' keyword to access corresponding transcripts
-  --seq1 SEQ1, -1 SEQ1  First sequence of interest
+                        Path to the FASTA file or use 'human', 'mouse', 'human_pc' or 'mouse_pc' keyword to access corresponding transcripts.
+  --seq1 SEQ1, -1 SEQ1  First sequence of interest.
   --seq2 SEQ2, -2 SEQ2  (Optional) Second sequence of interest. If omitted, only seq1 will be searched.
   --output OUTPUT, -o OUTPUT
                         Output file name. Possible extensions: 'csv', 'tsv'
@@ -73,8 +73,8 @@ optional arguments:
                         Retrieve only sequences associated with SNVs from ClinVar. Implies --pathogenicity.
   --gene-list GENE_LIST, -gl GENE_LIST
                         Path to a txt file containing a list of gene names to be analyzed, OR a semicolon-separated list of gene names (e.g. 'HBB;HTT').
-  --apply-variants, -av
-                        If set, creates a temporary FASTA file with sequences modified according to the variants. Implies --pathogenicity.
+  --variant-window VARIANT_WINDOW, -vw VARIANT_WINDOW
+                        Maximum distance between the mutation and the found PAM sequence. Implies --pathogenicity.
 ```
 
 ### GUI Usage
