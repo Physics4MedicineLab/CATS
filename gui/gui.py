@@ -4,8 +4,6 @@ import re
 import threading
 import platform
 from tkinter import filedialog, messagebox
-import subprocess
-import webbrowser
 
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -144,7 +142,6 @@ def main():
         pathogenicity = pathogenicity_var.get()
         snv = snv_var.get()
         gene_list = gene_list_entry.get()
-        apply_variants = apply_variants_var.get()
 
         def update_progress(current, total):
             progress_percent = int((current / total) * 100)
@@ -166,7 +163,6 @@ def main():
                     pathogenicity=pathogenicity,
                     snv=snv,
                     gene_list=gene_list,
-                    apply_variants=apply_variants,
                     variant_window=variant_window_val,
                     progress_callback=progress_callback
                 )
@@ -216,9 +212,9 @@ def main():
 
     def update_pathogenicity(*args):
         """
-        Ensure 'Pathogenic' is checked if 'SNVs' or 'Apply Variants' is checked.
+        Ensure 'Pathogenic' is checked if 'SNVs' is checked.
         """
-        if snv_var.get() or apply_variants_var.get():
+        if snv_var.get():
             pathogenicity_var.set(True)
 
     root = ttk.Window(themename="cosmo", iconphoto=ICON_FILE)
@@ -432,11 +428,9 @@ def main():
 
     pathogenicity_var = ttk.BooleanVar()
     snv_var = ttk.BooleanVar()
-    apply_variants_var = ttk.BooleanVar()
 
-    # Ensure 'Pathogenic' is checked if 'SNVs' or 'Apply Variants' is checked
+    # Ensure 'Pathogenic' is checked if 'SNVs' is checked
     snv_var.trace_add("write", update_pathogenicity)
-    apply_variants_var.trace_add("write", update_pathogenicity)
 
     pathogenicity_checkbox = ttk.Checkbutton(flag_frame, text="Pathogenic", variable=pathogenicity_var,
                                                style="general.success.TCheckbutton")
@@ -444,9 +438,6 @@ def main():
 
     snv_checkbox = ttk.Checkbutton(flag_frame, text="SNVs", variable=snv_var, style="general.success.TCheckbutton")
     snv_checkbox.grid(row=0, column=1, padx=20, pady=5, sticky="nsew")
-    apply_variants_checkbox = ttk.Checkbutton(flag_frame, text="Apply Variants", variable=apply_variants_var,
-                                                style="general.success.TCheckbutton")
-    apply_variants_checkbox.grid(row=0, column=2, padx=20, pady=5, sticky="nsew")
 
     button_frame = ttk.Frame(input_frame)
     button_frame.grid(row=6, column=0, columnspan=4, sticky="nsew", padx=5, pady=20)
