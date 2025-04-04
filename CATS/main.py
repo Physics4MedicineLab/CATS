@@ -785,12 +785,14 @@ def run_cats(fasta_file,
             res = res[res["Variant distance"] <= variant_window]
         os.makedirs(os.path.dirname(output), exist_ok=True)
         with open(output, 'w') as f:
-            f.write("# Used settings:\n")
+            f.write("# Run settings:\n")
             f.write(f"#\tFASTA:          {fasta_file}\n")
-            f.write(f"#\tSeq1:           {seq1}\n")
             if seq2:
-                f.write(f"#\tSeq2:           {seq2}\n")
-            f.write(f"#\tWindow size:    {window_size}\n")
+                f.write(f"#\tSequence 1:     {seq1}\n")
+                f.write(f"#\tSequence 2:     {seq2}\n")
+                f.write(f"#\tWindow size:    {window_size}\n")
+            else:
+                f.write(f"#\tSequence:       {seq1}\n")
             f.write(f"#\tNum. bases:     {num_bases}\n")
             f.write(f"#\tPathogenicity:  {pathogenic}\n")
             f.write(f"#\tSNV:            {snv}\n")
