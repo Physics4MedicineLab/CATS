@@ -322,7 +322,7 @@ def main():
     docs_text.insert("end", 
         "-  FASTA Dropdown: Choose a genome reference from the"
         " following options: 'HUMAN', 'HUMAN Protein coding', 'MOUSE', "
-        "'MOUSE Protein coding', 'CUSTOM'\n", "bulleted"
+        "'MOUSE Protein coding', 'CUSTOM'.\n", "bulleted"
     )
     docs_text.insert("end", 
         "The HUMAN and MOUSE choices will automatically retrieve"
@@ -353,14 +353,14 @@ def main():
     )
     docs_text.insert("end",
         "-  Filename: Enter the base name of the output file (without extension). "
-        "Required field.\n\n", "bulleted"
+        "Required field.\n", "bulleted"
     )
     docs_text.insert("end", 
         "-  Extension: Choose between CSV or TSV formats for "
-        "the output file.\n", "bulleted"
+        "the output file.\n\n", "bulleted"
     )
 
-    docs_text.insert("end", "Parameters:\n", "subtitle")
+    docs_text.insert("end", "Parsing parameters:\n", "subtitle")
     docs_text.insert("end",
         "-  Window Size (default 5): Set the size of the window "
         "around the sequences (for double-sequence mode).\n", "bulleted"
@@ -494,7 +494,7 @@ def main():
     extension_combobox.set("csv")
     extension_combobox.grid(row=1, column=3, sticky="w", padx=5, pady=5)
 
-    param_frame = ttk.Labelframe(input_frame, text="  Parameters  ", bootstyle="primary")
+    param_frame = ttk.Labelframe(input_frame, text="  Parsing parameters  ", bootstyle="primary")
     param_frame.grid(row=3, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
     param_frame.grid_columnconfigure(0, weight=0, minsize=180)
     param_frame.grid_columnconfigure(1, weight=1)
@@ -514,7 +514,7 @@ def main():
     gene_list_browse = ttk.Button(param_frame, text="Browse", command=lambda: browse_file(gene_list_entry), style='general.TButton')
     gene_list_browse.grid(row=4, column=2, padx=5, pady=5)
 
-    flag_frame = ttk.Labelframe(input_frame, text="  Mutation flags - Human only  ", bootstyle="primary")
+    flag_frame = ttk.Labelframe(input_frame, text="  Pathogenic variants - Human only  ", bootstyle="primary")
     flag_frame.grid(row=4, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
     flag_frame.grid_columnconfigure(0, weight=0, minsize=180)
     flag_frame.grid_columnconfigure(1, weight=1)
