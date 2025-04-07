@@ -207,7 +207,7 @@ def main():
             gtf_entry.delete(0, END)
             gtf_entry.insert(0, "../db/mouse/gencode.vM36.annotation.gtf.gz")
         elif selection == "CUSTOM":
-            fasta_entry.grid(row=0, column=1, sticky="we", padx=5, pady=5)
+            fasta_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
             browse_button.grid(row=0, column=2, padx=5, pady=5)
 
     def update_pathogenicity(*args):
@@ -226,8 +226,8 @@ def main():
 
     root.tk.call('tk', 'scaling', 1.4)
 
-    root.geometry("1260x920")
-    root.minsize(1260, 920)
+    root.geometry("1100x950")
+    root.minsize(1100, 950)
 
     root.grid_rowconfigure(0, weight=0)
     root.grid_rowconfigure(1, weight=1)
@@ -270,12 +270,14 @@ def main():
                                            Image.Resampling.LANCZOS)
     cat_image = ImageTk.PhotoImage(resized_image)
 
-    banner_label = ttk.Label(banner_frame,
-                             text="    Welcome to CATS",
-                             style='Banner.TLabel',
-                             image=cat_image,
-                             compound='left',
-                             padding=5)
+    banner_label = ttk.Label(
+        banner_frame,
+        text="    Welcome to CATS",
+        style='Banner.TLabel',
+        image=cat_image,
+        compound='left',
+        padding=5
+    )
     banner_label.image = cat_image
     banner_label.pack(fill="x")
 
@@ -299,8 +301,104 @@ def main():
 
     docs_text = ttk.Text(docs_frame, wrap="word", font=font_medium)
     docs_text.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
-    docs_text.insert("end", "CATS is a bioinformatic tool designed to find genomic regions nearby two distinct sequences of interest.\n\n")
-    docs_text.insert("end", "Please refer to the complete documentation on GitHub.")
+    docs_text.tag_configure("title", font=("Helvetica", 16, "bold", "underline"), spacing3=10)
+    docs_text.tag_configure("subtitle", font=("Helvetica", 14, "bold"), foreground="#333")
+    docs_text.tag_configure("body", font=("Helvetica", 12), spacing3=6)
+    docs_text.tag_configure("bulleted", font=("Helvetica", 12), lmargin1=40, lmargin2=40)
+
+    docs_text.insert("end", "What is CATS?\n", "title")
+    docs_text.insert("end",
+        "CATS is a bioinformatic tool designed to identify genomic regions near "
+        "two distinct sequences of interest.\n\n", "body"
+    )
+
+    docs_text.insert("end", "CATS Input tab Documentation:\n", "title")
+    docs_text.insert("end", 
+        "The CATS Input Tab is where you configure the parameters "
+        "and settings for running CATS. Below are the main parameters.\n", "body"
+    )
+
+    docs_text.insert("end", "Genome Inputs:\n", "subtitle")
+    docs_text.insert("end", 
+        "-  FASTA Dropdown: Choose a genome reference from the"
+        " following options: 'HUMAN', 'HUMAN Protein coding', 'MOUSE', "
+        "'MOUSE Protein coding', 'CUSTOM'\n", "bulleted"
+    )
+    docs_text.insert("end", 
+        "The HUMAN and MOUSE choices will automatically retrieve"
+        " the corresponding GENCODE genomes and annotations. When selecting 'CUSTOM',"
+        " a text box and 'Browse' button appear, allowing the user to provide a"
+        " custom FASTA file path.\n", "bulleted"
+    )
+    docs_text.insert("end", 
+        "-  GTF Entry: Automatically filled based on the chosen genome. "
+        "You can also manually browse for a GTF file. It is not necessary"
+        " for a custom FASTA file.\n\n", "bulleted"
+    )
+
+    docs_text.insert("end", "Sequences:\n", "subtitle")
+    docs_text.insert("end",
+        "-  Sequence 1: Enter the first (or unique) PAM sequence"
+        " for the analysis. Required field.\n", "bulleted"
+    )
+    docs_text.insert("end", 
+        "-  Sequence 2 (optional): Enter a secondary sequence for"
+        " automatic detection of overlapping PAM sequences.\n\n", "bulleted"
+    )
+
+    docs_text.insert("end", "Output:\n", "subtitle")
+    docs_text.insert("end",
+        "-  Output Folder: Specify the directory where results will be saved. "
+        "Use the 'Browse' button to select a folder. Required field.\n", "bulleted"
+    )
+    docs_text.insert("end",
+        "-  Filename: Enter the base name of the output file (without extension). "
+        "Required field.\n\n", "bulleted"
+    )
+    docs_text.insert("end", 
+        "-  Extension: Choose between CSV or TSV formats for "
+        "the output file.\n", "bulleted"
+    )
+
+    docs_text.insert("end", "Parameters:\n", "subtitle")
+    docs_text.insert("end",
+        "-  Window Size (default 5): Set the size of the window "
+        "around the sequences (for double-sequence mode).\n", "bulleted"
+    )
+    docs_text.insert("end",
+        "-  Num Bases (default 25): Specify the number of bases"
+        " preceding and succeeding each sequence to include in the output.\n", "bulleted"
+    )
+    docs_text.insert("end",
+        "-  Gene List: Optionally specify a file containing a list of gene names "
+        "to include in the analysis. You can also enter gene names directly, separated"
+        " by semicolons (e.g., HBB;HTT).\n\n", "bulleted"
+    )
+
+    docs_text.insert("end", "Pathogenic variants:\n", "subtitle")
+    docs_text.insert("end",
+        "-  Pathogenic: Check to include only sequences containing potentially"
+        " pathogenic variants, as identified by ClinVar.\n", "bulleted"
+    )
+    docs_text.insert("end",
+        "-  SNVs: Check to include only sequences associated with"
+        " single nucleotide variants (SNVs) from ClinVar. Enabling this also"
+        " checks 'Pathogenic'.\n", "bulleted"
+    )
+    docs_text.insert("end",
+        "-  Variant Window: Specify the maximum distance between a"
+        " mutation and the found PAM sequence. If left blank, it will "
+        "use the number of bases specified earlier. A distance of 0 corresponds"
+        " to a mutation inside the PAM sequence.\n\n", "bulleted"
+    )
+
+    docs_text.insert("end",
+        "After configuring the inputs, click the Run button. "
+        "Monitor the process in the Logging tab.\n\n", "body"
+    )
+    docs_text.insert("end", "GiHub repository:  ", "body")
+    docs_text.insert("end", "https://github.com/Physics4MedicineLab/CATS\n", "body")
+
     docs_text.configure(state="disabled")
 
     for i in range(12):
@@ -311,6 +409,10 @@ def main():
 
     genome_frame = ttk.Labelframe(input_frame, text="  Genome Inputs  ", bootstyle="primary")
     genome_frame.grid(row=0, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+
+    genome_frame.grid_columnconfigure(0, weight=0, minsize=180)
+    genome_frame.grid_columnconfigure(1, weight=1)
+    genome_frame.grid_columnconfigure(2, weight=0, minsize=80)
 
     fasta_var = ttk.StringVar()
     gtf_var = ttk.StringVar()
@@ -335,71 +437,68 @@ def main():
     )
 
     gtf_label = ttk.Label(genome_frame, text="GTF:", font=font_large)
-    gtf_label.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+    gtf_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
     gtf_entry = ttk.Entry(genome_frame, textvariable=gtf_var, font=font_large, width=50)
-    gtf_entry.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
-    gtf_browse_button = ttk.Button(
-        genome_frame,
-        text="Browse",
-        command=lambda: browse_file(gtf_entry),
-        style='general.TButton'
-    )
+    gtf_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+    gtf_browse_button = ttk.Button(genome_frame, text="Browse", command=lambda: browse_file(gtf_entry), style='general.TButton')
     gtf_browse_button.grid(row=1, column=2, padx=5, pady=5)
 
     seq_frame = ttk.Labelframe(input_frame, text="  Sequences  ", bootstyle="primary")
     seq_frame.grid(row=1, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+
+    seq_frame.grid_columnconfigure(0, weight=0, minsize=180)
+    seq_frame.grid_columnconfigure(1, weight=1)
 
     seq1_var = ttk.StringVar()
     seq2_var = ttk.StringVar()
 
     def create_labeled_entry(master, text, row, column, var):
         label = ttk.Label(master, text=text, font=font_large)
-        label.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
+        label.grid(row=row, column=column, sticky="w", padx=5, pady=5)
         entry = ttk.Entry(master, textvariable=var, font=font_large, width=50)
-        entry.grid(row=row, column=column+1, sticky="nsew", padx=5, pady=5)
+        entry.grid(row=row, column=column+1, sticky="ew", padx=5, pady=5)
         return entry
 
     seq1_entry = create_labeled_entry(seq_frame, "Sequence 1:", 0, 0, seq1_var)
-    seq2_entry = create_labeled_entry(seq_frame, "Sequence 2 [optional]:", 1, 0, seq2_var)
+    seq2_entry = create_labeled_entry(seq_frame, "Sequence 2 [optional]:   ", 1, 0, seq2_var)
 
-    param_frame = ttk.Labelframe(input_frame, text="  Parameters  ", bootstyle="primary")
-    param_frame.grid(row=2, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+    output_frame = ttk.Labelframe(input_frame, text="  Output  ", bootstyle="primary")
+    output_frame.grid(row=2, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+
+    output_frame.grid_columnconfigure(0, weight=0, minsize=180)
+    output_frame.grid_columnconfigure(1, weight=1)
+    output_frame.grid_columnconfigure(2, weight=0, minsize=80)
+    output_frame.grid_columnconfigure(3, weight=0, minsize=80)
 
     output_folder_var = ttk.StringVar()
-    output_folder_label = ttk.Label(param_frame, text="Output Folder:", font=font_large)
-    output_folder_label.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+    output_folder_label = ttk.Label(output_frame, text="Output Folder:               ", font=font_large)
+    output_folder_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
 
-    output_folder_entry = ttk.Entry(param_frame, textvariable=output_folder_var, font=font_large, width=40)
-    output_folder_entry.grid(row=0, column=1, sticky="nsew", padx=5, pady=5, columnspan=2)
-    output_folder_browse = ttk.Button(
-        param_frame,
-        text="Browse",
-        command=lambda: browse_folder(output_folder_entry),
-        style='general.TButton'
-    )
+    output_folder_entry = ttk.Entry(output_frame, textvariable=output_folder_var, font=font_large, width=40)
+    output_folder_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5, columnspan=2)
+
+    output_folder_browse = ttk.Button(output_frame, text="Browse", command=lambda: browse_folder(output_folder_entry), style='general.TButton')
     output_folder_browse.grid(row=0, column=3, padx=5, pady=5)
 
     output_filename_var = ttk.StringVar()
-    output_filename_label = ttk.Label(param_frame, text="Filename:", font=font_large)
-    output_filename_label.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+    output_filename_label = ttk.Label(output_frame, text="Filename:", font=font_large)
+    output_filename_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
 
-    output_filename_entry = ttk.Entry(param_frame, textvariable=output_filename_var, font=font_large, width=25)
-    output_filename_entry.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
+    output_filename_entry = ttk.Entry(output_frame, textvariable=output_filename_var, font=font_large, width=25)
+    output_filename_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
 
     extension_var = ttk.StringVar()
-    extension_label = ttk.Label(param_frame, text="Extension:", font=font_large)
-    extension_label.grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
-    extension_combobox = ttk.Combobox(
-        param_frame,
-        textvariable=extension_var,
-        values=["csv", "tsv"],
-        font=font_large,
-        width=8,
-        state="readonly",
-        style='general.TCombobox'
-    )
+    extension_label = ttk.Label(output_frame, text="Extension:", font=font_large)
+    extension_label.grid(row=1, column=2, sticky="w", padx=5, pady=5)
+    extension_combobox = ttk.Combobox(output_frame, textvariable=extension_var, values=["csv", "tsv"], font=font_large, width=8, state="readonly", style='general.TCombobox')
     extension_combobox.set("csv")
     extension_combobox.grid(row=1, column=3, sticky="w", padx=5, pady=5)
+
+    param_frame = ttk.Labelframe(input_frame, text="  Parameters  ", bootstyle="primary")
+    param_frame.grid(row=3, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+    param_frame.grid_columnconfigure(0, weight=0, minsize=180)
+    param_frame.grid_columnconfigure(1, weight=1)
+    param_frame.grid_columnconfigure(2, weight=0, minsize=80)
 
     window_size_var = ttk.StringVar()
     num_bases_var = ttk.StringVar()
@@ -407,37 +506,31 @@ def main():
     window_size_entry = create_labeled_entry(param_frame, "Window Size (default 5):", 2, 0, window_size_var)
     num_bases_entry = create_labeled_entry(param_frame, "Num Bases (default 25):", 3, 0, num_bases_var)
 
-    variant_window_var = ttk.StringVar()
-    variant_window_entry = create_labeled_entry(param_frame, "Variant Window:", 4, 0, variant_window_var)
-
     gene_list_var = ttk.StringVar()
     gene_list_label = ttk.Label(param_frame, text="Gene List:", font=font_large)
-    gene_list_label.grid(row=5, column=0, sticky="nsew", padx=5, pady=5)
+    gene_list_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
     gene_list_entry = ttk.Entry(param_frame, textvariable=gene_list_var, font=font_large, width=50)
-    gene_list_entry.grid(row=5, column=1, sticky="nsew", padx=5, pady=5)
-    gene_list_browse = ttk.Button(
-        param_frame,
-        text="Browse",
-        command=lambda: browse_file(gene_list_entry),
-        style='general.TButton'
-    )
-    gene_list_browse.grid(row=5, column=2, padx=5, pady=5)
+    gene_list_entry.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+    gene_list_browse = ttk.Button(param_frame, text="Browse", command=lambda: browse_file(gene_list_entry), style='general.TButton')
+    gene_list_browse.grid(row=4, column=2, padx=5, pady=5)
 
-    flag_frame = ttk.Labelframe(input_frame, text="  Flags - Human only  ", bootstyle="primary")
-    flag_frame.grid(row=3, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+    flag_frame = ttk.Labelframe(input_frame, text="  Mutation flags - Human only  ", bootstyle="primary")
+    flag_frame.grid(row=4, column=0, columnspan=4, sticky="nsew", padx=5, pady=5)
+    flag_frame.grid_columnconfigure(0, weight=0, minsize=180)
+    flag_frame.grid_columnconfigure(1, weight=1)
 
     pathogenicity_var = ttk.BooleanVar()
     snv_var = ttk.BooleanVar()
 
     # Ensure 'Pathogenic' is checked if 'SNVs' is checked
     snv_var.trace_add("write", update_pathogenicity)
-
-    pathogenicity_checkbox = ttk.Checkbutton(flag_frame, text="Pathogenic", variable=pathogenicity_var,
-                                               style="general.success.TCheckbutton")
-    pathogenicity_checkbox.grid(row=0, column=0, padx=20, pady=5, sticky="nsew")
-
+    pathogenicity_checkbox = ttk.Checkbutton(flag_frame, text="Pathogenic", variable=pathogenicity_var, style="general.success.TCheckbutton")
+    pathogenicity_checkbox.grid(row=0, column=0, padx=20, pady=5, sticky="w")
     snv_checkbox = ttk.Checkbutton(flag_frame, text="SNVs", variable=snv_var, style="general.success.TCheckbutton")
-    snv_checkbox.grid(row=0, column=1, padx=20, pady=5, sticky="nsew")
+    snv_checkbox.grid(row=0, column=1, padx=20, pady=5, sticky="w")
+
+    variant_window_var = ttk.StringVar()
+    variant_window_entry = create_labeled_entry(flag_frame, "Variant Window:            ", 1, 0, variant_window_var)
 
     button_frame = ttk.Frame(input_frame)
     button_frame.grid(row=6, column=0, columnspan=4, sticky="nsew", padx=5, pady=20)
