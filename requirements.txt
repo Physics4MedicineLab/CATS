@@ -6,5 +6,6 @@ ttkbootstrap
 screeninfo
 numpy
 pillow
+tqdm
 openpyxl
 Parsley
