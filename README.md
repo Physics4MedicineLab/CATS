@@ -33,7 +33,20 @@
    ```
 
 ### GUI installation
-Install the latest release, ensuring that you download the version compatible with your operating system.
+
+Install the latest [release](https://github.com/Physics4MedicineLab/CATS/releases), ensuring that you download the version compatible with your operating system.
+
+**NOTE for macOS users**:
+
+After downloading and unzipping the CATS folder, you may need to run the following command in your terminal to ensure the application runs correctly:
+
+```bash
+xattr -dr com.apple.quarantine <dir>/CATS/
+```
+Replace `<dir>` with the full path to the directory containing the unzipped CATS folder.
+
+Only run this command **once**, _after_ you have downloaded and unzipped the folder and _before_ launching the GUI.
+
 
 ## Usage
 
