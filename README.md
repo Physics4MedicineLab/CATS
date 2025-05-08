@@ -43,6 +43,10 @@ After downloading and unzipping the CATS folder, you may need to run the followi
 ```bash
 xattr -dr com.apple.quarantine <dir>/CATS/
 ```
+or
+```bash
+find <dir>/CATS/ -exec xattr -d com.apple.quarantine {} \;
+```
 Replace `<dir>` with the full path to the directory containing the unzipped CATS folder.
 
 Only run this command **once**, _after_ you have downloaded and unzipped the folder and _before_ launching the GUI.
