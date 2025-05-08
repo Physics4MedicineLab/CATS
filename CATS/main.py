@@ -1014,13 +1014,13 @@ def main():
     parser.add_argument("--seq2", "-2", dest="seq2", required=False,
                         help="(Optional) Second sequence of interest. If omitted, only seq1 will be searched.")
     parser.add_argument("--output", "-o", dest="output", required=True,
-                        help="Output file name. Possible extensions: 'csv', 'tsv'")
+                        help="Output file name. Possible extensions: 'csv', 'tsv', 'bed'.")
     parser.add_argument("--window-size", "-w", dest="window_size", default=5, type=int,
                         help="Size of the window around the sequences (for double-sequence mode). Default is 5.")
     parser.add_argument("--num-bases", "-n", dest="num_bases", default=25, type=int,
-                        help="Number of preceding and subsequent bases for each output sequence (Default is 25)")
+                        help="Number of preceding and subsequent bases for each output sequence. Default is 25.")
     parser.add_argument("--gtf", "-g", dest="gtf_file", required=False, default=None,
-                        help="Path to the GTF file for annotation")
+                        help="Path to the GTF file for annotation.")
     parser.add_argument("--pathogenicity", "-p", dest="pathogenicity", action='store_true',
                         help="Retrieve only sequences containing potentially pathogenic variants (ClinVar).")
     parser.add_argument("--single-nucleotide-variant", "-snv", dest="snv", action='store_true',

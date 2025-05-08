@@ -74,13 +74,13 @@ optional arguments:
   --seq1 SEQ1, -1 SEQ1  First sequence of interest.
   --seq2 SEQ2, -2 SEQ2  (Optional) Second sequence of interest. If omitted, only seq1 will be searched.
   --output OUTPUT, -o OUTPUT
-                        Output file name. Possible extensions: 'csv', 'tsv'
+                        Output file name. Possible extensions: 'csv', 'tsv', 'bed'.
   --window-size WINDOW_SIZE, -w WINDOW_SIZE
                         Size of the window around the sequences (for double-sequence mode). Default is 5.
   --num-bases NUM_BASES, -n NUM_BASES
-                        Number of preceding and subsequent bases for each output sequence (Default is 25)
+                        Number of preceding and subsequent bases for each output sequence. Default is 25.
   --gtf GTF_FILE, -g GTF_FILE
-                        Path to the GTF file for annotation
+                        Path to the GTF file for annotation.
   --pathogenicity, -p   Retrieve only sequences containing potentially pathogenic variants (ClinVar).
   --single-nucleotide-variant, -snv
                         Retrieve only sequences associated with SNVs from ClinVar. Implies --pathogenicity.
