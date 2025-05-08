@@ -104,8 +104,8 @@ def main():
             status_label.grid_remove()
             run_button.config(state='normal')
             return
-        if extension not in ["csv", "tsv"]:
-            messagebox.showerror("Error", "Please select a valid extension: csv, tsv.")
+        if extension not in ["csv", "tsv", "bed"]:
+            messagebox.showerror("Error", "Please select a valid extension: csv, tsv, bed.")
             status_label.config(text="", foreground="red")
             status_label.grid_remove()
             run_button.config(state='normal')
@@ -356,7 +356,7 @@ def main():
         "Required field.\n", "bulleted"
     )
     docs_text.insert("end", 
-        "-  Extension: Choose between CSV or TSV formats for "
+        "-  Extension: Choose between CSV, TSV or BED formats for "
         "the output file.\n\n", "bulleted"
     )
 
@@ -490,7 +490,7 @@ def main():
     extension_var = ttk.StringVar()
     extension_label = ttk.Label(output_frame, text="Extension:", font=font_large)
     extension_label.grid(row=1, column=2, sticky="w", padx=5, pady=5)
-    extension_combobox = ttk.Combobox(output_frame, textvariable=extension_var, values=["csv", "tsv"], font=font_large, width=8, state="readonly", style='general.TCombobox')
+    extension_combobox = ttk.Combobox(output_frame, textvariable=extension_var, values=["csv", "tsv", "bed"], font=font_large, width=8, state="readonly", style='general.TCombobox')
     extension_combobox.set("csv")
     extension_combobox.grid(row=1, column=3, sticky="w", padx=5, pady=5)
 

@@ -36,6 +36,14 @@ IUPAC_MAP = {
     "-": "[-.]"
 }
 
+IUPAC_COMPLEMENT = {
+    "A": "T", "T": "A", "C": "G", "G": "C",
+    "R": "Y", "Y": "R", "S": "S", "W": "W",
+    "K": "M", "M": "K", "B": "V", "V": "B",
+    "D": "H", "H": "D", "N": "N", "*": "N",
+    ".": ".", "-": "-"
+}
+
 class SequenceVariant:
     """Parsed variant sequence in hgvs format"""
     def __init__(self, ac, gene, var_type, posedit):
@@ -128,10 +136,36 @@ def is_gzipped(file_path: str) -> bool:
         magic_number = f.read(2)
     return magic_number == b'\x1f\x8b'
 
+def reverse_complement(seq):
+    """
+    Get the reverse complement of a DNA sequence using IUPAC notation.
+    """
+    return ''.join(IUPAC_COMPLEMENT[base] for base in reversed(seq.upper()))
+
+def create_pam_row(source, extras_str, color="0,0,255", prefix="PAM:"):
+    """
+    Create a row for the BED file format.
+    """
+    chrom, pos = source["index"].split(":")
+    bed_start = int(pos) - 1
+    bed_end = bed_start + len(source["seq"])
+    pam_name = f"{prefix}{source['Transcript ID']} | {source['Gene Name']} | {source.get('Biotype') or source.get('Regions', '.')}"
+    return {
+        "chrom": chrom,
+        "chromStart": bed_start,
+        "chromEnd": bed_end,
+        "name": pam_name,
+        "score": "0",
+        "strand": str(source.get("Strand", ".")),
+        "thickStart": bed_start,
+        "thickEnd": bed_end,
+        "itemRgb": color,
+        "extras": extras_str,
+    }
 
 def get_pathogenic_variants_from_api(snv: bool, verbose=True, gene_list=None):
     """
-    Fetch pathogenic variants from ClinVar E-Utils API.
+    Fetch pathogenic variants from ClinVar E-Utils API, including associated conditions.
     """
     base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
     search_url = base_url + "esearch.fcgi"
@@ -176,26 +210,58 @@ def get_pathogenic_variants_from_api(snv: bool, verbose=True, gene_list=None):
         summary_response.raise_for_status()
         variant_info = summary_response.json()['result'].get(variant_id, {})
         variation_title = variant_info.get('title', '')
+
+        conditions = set()
+        for trait in variant_info.get('germline_classification', {}).get('trait_set', []):
+            name = trait.get('trait_name')
+            if name:
+                conditions.add(name)
+        for cls in ('clinical_impact_classification', 'oncogenicity_classification'):
+            for trait in variant_info.get(cls, {}).get('trait_set', []):
+                name = trait.get('trait_name')
+                if name:
+                    conditions.add(name)
+        # Filter out "not provided", but if filtering removes all values, keep "not provided"
+        filtered_conditions = {cond for cond in conditions if cond.lower() != "not provided"}
+        condition_str = ";".join(sorted(filtered_conditions)) if filtered_conditions else "not provided"
+
         for variant in variant_info.get("variation_set", []):
             variant_type = variant.get("variant_type", "")
             for loc in variant.get('variation_loc', []):
-                if loc['assembly_name'] == 'GRCh38':
-                    chrom = "chr" + loc['chr']
-                    pos_start = int(loc['start'])
-                    pos_stop = int(loc['stop'])
+                if loc.get('assembly_name') == 'GRCh38':
+                    chrom = "chr" + loc.get('chr', '')
+                    pos_start = int(loc.get('start', 0))
+                    pos_stop = int(loc.get('stop', 0))
                     pathogenic_variants.setdefault(chrom, []).append(
-                        (pos_start, pos_stop, variation_title, variant_type)
+                        (pos_start,
+                         pos_stop,
+                         variation_title,
+                         variant_type,
+                         condition_str)
                     )
     return pathogenic_variants
 
 
-def extract_transcripts(db):
+def extract_transcripts(db, pathogenic:bool):
     """
     Extract transcripts from GFF/GTF feature database.
     """
     transcripts = {}
-    for transcript in db.features_of_type('transcript'):
-        if "MANE_Select" in transcript.attributes.get('tag', [None]):
+    if pathogenic:
+        for transcript in db.features_of_type('transcript'):
+            if "MANE_Select" in transcript.attributes.get('tag', [None]):
+                transcripts[transcript.id] = {
+                    'id': transcript.id,
+                    'chrom': transcript.chrom,
+                    'start': transcript.start,
+                    'end': transcript.end,
+                    'strand': transcript.strand,
+                    'gene_id': transcript.attributes['gene_id'][0],
+                    'gene_name': transcript.attributes.get('gene_name', [None])[0],
+                    'transcript_type': transcript.attributes.get('transcript_type', [None])[0],
+            }
+    else:
+        for transcript in db.features_of_type('transcript'):
             transcripts[transcript.id] = {
                 'id': transcript.id,
                 'chrom': transcript.chrom,
@@ -247,7 +313,7 @@ def process_record_w_transcripts(args):
                 result.append(base_dict)
             else:
                 if record_info["chrom"] in pathogenic_variants:
-                    for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
+                    for var_start, var_stop, var_title, _, condition in pathogenic_variants[record_info["chrom"]]:
                         seq_region_start = record_info['start'] + start_idx
                         seq_region_end = record_info['start'] + end_idx
 
@@ -269,7 +335,8 @@ def process_record_w_transcripts(args):
                             variant_dict.update({
                                 "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
                                 "Variant distance": var_distance,
-                                "Variant name": var_title
+                                "Variant name": var_title,
+                                "Condition": condition,
                             })
                             result.append(variant_dict)
     # DOUBLE-SEQUENCE SEARCH
@@ -297,7 +364,7 @@ def process_record_w_transcripts(args):
                     result.append(base_dict)
                 else:
                     if record_info["chrom"] in pathogenic_variants:
-                        for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
+                        for var_start, var_stop, var_title, _, condition in pathogenic_variants[record_info["chrom"]]:
                             seq_region_start = record_info['start'] + start_idx
                             seq_region_end = record_info['start'] + end_idx
 
@@ -325,7 +392,8 @@ def process_record_w_transcripts(args):
                                 variant_dict.update({
                                     "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
                                     "Variant distance": var_distance,
-                                    "Variant name": var_title
+                                    "Variant name": var_title,
+                                    "Condition": condition,
                                 })
                                 result.append(variant_dict)
     return result
@@ -368,7 +436,7 @@ def process_record_w_transcripts_pc(args):
                 result.append(base_dict)
             else:
                 if record_info["chrom"] in pathogenic_variants:
-                    for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
+                    for var_start, var_stop, var_title, _, condition in pathogenic_variants[record_info["chrom"]]:
                         seq_region_start = record_info['start'] + start_idx
                         seq_region_end = record_info['start'] + end_idx
 
@@ -390,7 +458,8 @@ def process_record_w_transcripts_pc(args):
                             variant_dict.update({
                                 "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
                                 "Variant distance": var_distance,
-                                "Variant name": var_title
+                                "Variant name": var_title,
+                                "Condition": condition,
                             })
                             result.append(variant_dict)
     else:
@@ -417,7 +486,7 @@ def process_record_w_transcripts_pc(args):
                     result.append(base_dict)
                 else:
                     if record_info["chrom"] in pathogenic_variants:
-                        for var_start, var_stop, var_title, _ in pathogenic_variants[record_info["chrom"]]:
+                        for var_start, var_stop, var_title, _, condition in pathogenic_variants[record_info["chrom"]]:
                             seq_region_start = record_info['start'] + start_idx
                             seq_region_end = record_info['start'] + end_idx
 
@@ -445,7 +514,8 @@ def process_record_w_transcripts_pc(args):
                                 variant_dict.update({
                                     "Variant position": f"{record_info['chrom']}:{var_start}-{var_stop}",
                                     "Variant distance": var_distance,
-                                    "Variant name": var_title
+                                    "Variant name": var_title,
+                                    "Condition": condition,
                                 })
                                 result.append(variant_dict)
     return result
@@ -493,10 +563,10 @@ def process_record_no_transcripts(args):
 
 
 def parse_fasta(fasta_file: str,
-                seq1_pattern: str,
-                seq2_pattern: Union[str, None],
+                seq1: str,
+                seq2: Union[str, None],
                 pathogenic_variants: Union[dict, None],
-                gtf_db: Union[gffutils.FeatureDB, None],
+                transcripts: dict,
                 window_size: int,
                 num_bases: int,
                 gene_list: Union[set, None],
@@ -504,19 +574,27 @@ def parse_fasta(fasta_file: str,
                 progress_callback=None) -> list:
     """
     Parse the (possibly gzipped) FASTA and search for matches.
-    A progress callback is called after processing each record.
+    A progress bar is displayed to report the status.
     """
     result = []
     if pathogenic_variants == {}:
         return result
 
     open_func = gzip.open if is_gzipped(fasta_file) else open
-    transcripts = extract_transcripts(gtf_db) if gtf_db else None
 
     with open_func(fasta_file, "rt") as handle:
         records = list(SeqIO.parse(handle, "fasta"))
 
     total = len(records)
+    seq1_pattern = create_sequence_pattern(seq1)
+    seq2_pattern = None if not seq2 else create_sequence_pattern(seq2)
+
+    seq1_rc = reverse_complement(seq1)
+    seq2_rc = reverse_complement(seq2) if seq2 else None
+
+    seq1_rc_pattern = create_sequence_pattern(seq1_rc)
+    seq2_rc_pattern = None if not seq2_rc else create_sequence_pattern(seq2_rc)
+    
     single_seq = (seq2_pattern is None or seq2_pattern.strip() == "")
 
     # Select the appropriate worker function
@@ -530,6 +608,18 @@ def parse_fasta(fasta_file: str,
                     record,
                     seq1_pattern,
                     seq2_pattern,
+                    transcripts,
+                    pathogenic_variants,
+                    window_size,
+                    num_bases,
+                    gene_list,
+                    single_seq
+                )))
+        # run also the reverse complement(s)
+        result.extend(process_record((
+                    record,
+                    seq1_rc_pattern,
+                    seq2_rc_pattern,
                     transcripts,
                     pathogenic_variants,
                     window_size,
@@ -631,15 +721,13 @@ def run_cats(fasta_file,
     print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tChecking and setting parameters.")
 
     ext = os.path.splitext(output)[1].lower()
-    if ext not in [".csv", ".tsv"]:
-        raise ValueError("Output extension not recognised: possible choices are 'csv', 'tsv'.")
+    if ext not in [".csv", ".tsv", '.bed']:
+        raise ValueError("Output extension not recognised: possible choices are 'csv', 'tsv', 'bed'.")
     if os.path.isfile(output):
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: WARNING\tOutput file {output} exists. It will be overwritten.")
 
     seq1, seq2 = check_sequences([seq1, seq2])
-    seq1_pattern = create_sequence_pattern(seq1)
-    seq2_pattern = None if not seq2 else create_sequence_pattern(seq2)
-    if seq2_pattern:
+    if seq2:
         window_size = max(window_size, len(seq1), len(seq2))
 
     snv = bool(snv)
@@ -657,24 +745,60 @@ def run_cats(fasta_file,
 
     gtf_dbfn = None
     if fasta_file == "human":
-        fasta_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/human/gencode.v47.transcripts.fa.gz")
-        gtf_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/human/gencode.v47.annotation.gtf.gz")
-        gtf_dbfn = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/human/gencode_v47.db")
+        fasta_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "human", "gencode.v47.transcripts.fa.gz"
+        )
+        gtf_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "human", "gencode.v47.annotation.gtf.gz"
+        )
+        gtf_dbfn = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "human", "gencode_v47.db"
+        )
         is_pc = False
     elif fasta_file == "human_pc":
-        fasta_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/human/gencode.v47.pc_transcripts.fa.gz")
-        gtf_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/human/gencode.v47.annotation.gtf.gz")
-        gtf_dbfn = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/human/gencode_v47_pc.db")
+        fasta_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "human", "gencode.v47.pc_transcripts.fa.gz"
+        )
+        gtf_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "human", "gencode.v47.annotation.gtf.gz"
+        )
+        gtf_dbfn = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "human", "gencode_v47_pc.db"
+        )
         is_pc = True
     elif fasta_file == "mouse":
-        fasta_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/mouse/gencode.vM36.transcripts.fa.gz")
-        gtf_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/mouse/gencode.vM36.annotation.gtf.gz")
-        gtf_dbfn = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/mouse/gencode_vM36.db")
+        fasta_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "mouse", "gencode.vM36.transcripts.fa.gz"
+        )
+        gtf_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "mouse", "gencode.vM36.annotation.gtf.gz"
+        )
+        gtf_dbfn = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "mouse", "gencode_vM36.db"
+        )
         is_pc = False
     elif fasta_file == "mouse_pc":
-        fasta_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/mouse/gencode.vM36.pc_transcripts.fa.gz")
-        gtf_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/mouse/gencode.vM36.annotation.gtf.gz")
-        gtf_dbfn = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../db/mouse/gencode_vM36_pc.db")
+        fasta_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "mouse", "gencode.vM36.pc_transcripts.fa.gz"
+        )
+        gtf_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "mouse", "gencode.vM36.annotation.gtf.gz"
+        )
+        gtf_dbfn = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "db", "mouse", "gencode_vM36_pc.db"
+        )
         is_pc = True
     elif not gtf_file and os.path.isfile(fasta_file):
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: WARNING\tWith a custom FASTA and no specified '--gtf', CATS will parse only the sequences; pathogenicity and gene_list will be ignored.")
@@ -702,11 +826,12 @@ def run_cats(fasta_file,
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tConnecting to GFF database.")
         gtf_db = gffutils.FeatureDB(gtf_dbfn)
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tExtracting transcripts.")
-        transcripts = extract_transcripts(gtf_db)
+        transcripts = extract_transcripts(gtf_db, pathogenic)
     else:
         pathogenic = False
         temp_fasta_file = fasta_file
         gtf_db = None
+        transcripts = None
         gene_list = None
         is_pc = False
 
@@ -735,7 +860,7 @@ def run_cats(fasta_file,
                 if pathogenic_variants is None or chrom not in pathogenic_variants:
                     continue
                 for variant in pathogenic_variants[chrom]:
-                    variant_start, variant_end, variation_title, variant_type = variant
+                    variant_start, variant_end, variation_title, variant_type, _ = variant
                     if (variant_start <= record_info['end'] and variant_end >= record_info['start']):
                         variant_info = parse_hgvs_notation(variation_title, variant_start, variant_end, hgvs_parser)
                         if variant_info is None:
@@ -768,15 +893,14 @@ def run_cats(fasta_file,
     print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tStarting FASTA parsing process.")
     result_sequences = parse_fasta(
         fasta_file=temp_fasta_file,
-        seq1_pattern=seq1_pattern,
-        seq2_pattern=seq2_pattern,
+        seq1=seq1,
+        seq2=seq2,
         pathogenic_variants=pathogenic_variants,
-        gtf_db=gtf_db,
+        transcripts=transcripts,
         window_size=window_size,
         num_bases=num_bases,
         gene_list=gene_list,
-        is_pc=is_pc,
-        progress_callback=progress_callback
+        is_pc=is_pc
     )
 
     if not result_sequences:
@@ -794,11 +918,11 @@ def run_cats(fasta_file,
             f.write("# Run settings:\n")
             f.write(f"#\tFASTA:          {fasta_file}\n")
             if seq2:
-                f.write(f"#\tSequence 1:     {seq1}\n")
-                f.write(f"#\tSequence 2:     {seq2}\n")
+                f.write(f"#\tSequence 1:     {seq1} (and {reverse_complement(seq1)})\n")
+                f.write(f"#\tSequence 2:     {seq2} (and {reverse_complement(seq2)})\n")
                 f.write(f"#\tWindow size:    {window_size}\n")
             else:
-                f.write(f"#\tSequence:       {seq1}\n")
+                f.write(f"#\tSequence:       {seq1} (and {reverse_complement(seq1)})\n")
             f.write(f"#\tNum. bases:     {num_bases}\n")
             f.write(f"#\tPathogenicity:  {pathogenic}\n")
             f.write(f"#\tSNV:            {snv}\n")
@@ -811,6 +935,70 @@ def run_cats(fasta_file,
             res.to_csv(output, mode="a", index=False)
         elif ext == ".tsv":
             res.to_csv(output, mode="a", index=False, sep="\t")
+        elif ext == ".bed":
+            mandatory = ["chrom", "chromStart", "chromEnd", "name", "score", "strand", "thickStart", "thickEnd", "itemRgb"]
+            bed_rows = []
+            extras_cols = [col for col in res.columns if col not in mandatory]
+            for _, row in res.iterrows():
+                extra_values = [str(row[col]) if pd.notnull(row[col]) else "." for col in extras_cols]
+                extras_str = "\t".join(extra_values)
+
+                if pathogenic:
+                    chrom, pos = row["Variant position"].split(":")
+                    start, end = map(int, pos.split("-"))
+                    variant_row = {
+                        "chrom": chrom,
+                        "chromStart": start - 1,
+                        "chromEnd": end,
+                        "name": f"Variant:{row.get('Variant name', '.')}",
+                        "score": "0",
+                        "strand": str(row.get("Strand", ".")),
+                        "thickStart": start - 1,
+                        "thickEnd": end,
+                        "itemRgb": "255,0,0",
+                        "extras": extras_str,
+                    }
+                    bed_rows.append(variant_row)
+                if pd.notnull(row.get("Matched seq index")):
+                    pam_source = {
+                        "index": row["Matched seq index"],
+                        "seq": row.get("Matched seq", ""),
+                        "Transcript ID": row["Transcript ID"],
+                        "Gene Name": row["Gene Name"],
+                        "Strand": row.get("Strand", "."),
+                        "Biotype": row.get("Biotype"),
+                        "Regions": row.get("Regions", "."),
+                    }
+                    bed_rows.append(create_pam_row(pam_source, extras_str))
+                elif pd.notnull(row.get("First seq index")) and pd.notnull(row.get("Second seq index")):
+                    for key, color, pre in [
+                            ("First seq", "0,0,255", "PAM 1:"), 
+                            ("Second seq", "0,255,0", "PAM 2:")
+                        ]:
+                        pam_source = {
+                            "index": row[f"{key} index"],
+                            "seq": row.get(key, ""),
+                            "Transcript ID": row["Transcript ID"],
+                            "Gene Name": row["Gene Name"],
+                            "Strand": row.get("Strand", "."),
+                            "Biotype": row.get("Biotype"),
+                            "Regions": row.get("Regions", "."),
+                        }
+                        bed_rows.append(create_pam_row(pam_source, extras_str, color, prefix=pre))
+
+            bed_df = pd.DataFrame(bed_rows)
+            mask = bed_df["name"].str.startswith("Variant:")
+            variant_rows = bed_df[mask].drop_duplicates(subset=mandatory)
+            non_variant_rows = bed_df[~mask]
+            bed_df = pd.concat([variant_rows, non_variant_rows], ignore_index=True)
+
+            with open(output, "a") as f:
+                header_line = "# " + "\t".join(mandatory + ["extras"])
+                f.write(header_line + "\n")
+                for _, r in bed_df.iterrows():
+                    line = "\t".join(str(r[col]) for col in mandatory) + "\t" + str(r["extras"])
+                    f.write(line + "\n")
+
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tResults saved in {output}.")
 
     if pathogenic or gene_list is not None:
