@@ -142,26 +142,53 @@ def reverse_complement(seq):
     """
     return ''.join(IUPAC_COMPLEMENT[base] for base in reversed(seq.upper()))
 
-def create_pam_row(source, extras_str, color="0,0,255", prefix="PAM:"):
+def keep_by_var_position(row):
+    """
+    In the final dataframe, keep only the rows with the variant before the PAM.
+    """
+    if row["Variant distance"] == 0:
+        return True
+
+    chrom, rng = row["Variant position"].split(":")
+    var_start, var_end = map(int, rng.split("-"))
+
+    if pd.notnull(row.get("Matched seq index")):
+        pam_start = int(row["Matched seq index"].split(":")[1])
+        pam_ends  = [pam_start]
+    else:
+        pam1 = int(row["First seq index"].split(":")[1])
+        pam2 = int(row["Second seq index"].split(":")[1])
+        pam_ends = [pam1, pam2]
+
+    if row["Strand"] == "+":
+        return all(var_end <= pe for pe in pam_ends)
+    elif row["Strand"] == "-":
+        return all(var_start >= pe for pe in pam_ends)
+    else:
+        return False
+
+def create_pam_row(source, extra_map, color="0,0,255", prefix="PAM:"):
     """
     Create a row for the BED file format.
     """
     chrom, pos = source["index"].split(":")
     bed_start = int(pos) - 1
-    bed_end = bed_start + len(source["seq"])
-    pam_name = f"{prefix}{source['Transcript ID']} | {source['Gene Name']} | {source.get('Biotype') or source.get('Regions', '.')}"
-    return {
+    bed_end   = bed_start + len(source["seq"])
+
+    base = {
         "chrom": chrom,
         "chromStart": bed_start,
         "chromEnd": bed_end,
-        "name": pam_name,
+        "name": f"{prefix}{source['Transcript ID']} | {source['Gene Name']} | "
+                f"{source.get('Biotype') or source.get('Regions', '.')}",
         "score": "0",
         "strand": str(source.get("Strand", ".")),
         "thickStart": bed_start,
         "thickEnd": bed_end,
         "itemRgb": color,
-        "extras": extras_str,
     }
+    base.update(extra_map)
+    return base
 
 def get_pathogenic_variants_from_api(snv: bool, verbose=True, gene_list=None):
     """
@@ -908,6 +935,9 @@ def run_cats(fasta_file,
             res = res[res.apply(lambda row: row["Variant name"].split(" ")[0] in row["Biotype"], axis=1)]
         if variant_window != num_bases:
             res = res[res["Variant distance"] <= variant_window]
+        if pathogenic:
+            res = res[res.apply(keep_by_var_position, axis=1)]
+
         os.makedirs(os.path.dirname(output), exist_ok=True)
         with open(output, 'w') as f:
             f.write("# Run settings:\n")
@@ -932,15 +962,17 @@ def run_cats(fasta_file,
             res.to_csv(output, mode="a", index=False, sep="\t")
         elif ext == ".bed":
             mandatory = ["chrom", "chromStart", "chromEnd", "name", "score", "strand", "thickStart", "thickEnd", "itemRgb"]
+            extra_cols = [c for c in res.columns if c not in mandatory]
+            header_cols = mandatory + extra_cols
             bed_rows = []
-            extras_cols = [col for col in res.columns if col not in mandatory]
             for _, row in res.iterrows():
-                extra_values = [str(row[col]) if pd.notnull(row[col]) else "." for col in extras_cols]
-                extras_str = "\t".join(extra_values)
-
+                extra_map = {
+                    col: (str(row[col]) if pd.notnull(row[col]) else ".")
+                    for col in extra_cols
+                }
                 if pathogenic:
-                    chrom, pos = row["Variant position"].split(":")
-                    start, end = map(int, pos.split("-"))
+                    chrom, span = row["Variant position"].split(":")
+                    start, end = map(int, span.split("-"))
                     variant_row = {
                         "chrom": chrom,
                         "chromStart": start - 1,
@@ -951,48 +983,40 @@ def run_cats(fasta_file,
                         "thickStart": start - 1,
                         "thickEnd": end,
                         "itemRgb": "255,0,0",
-                        "extras": extras_str,
                     }
+                    variant_row.update(extra_map)
                     bed_rows.append(variant_row)
                 if pd.notnull(row.get("Matched seq index")):
-                    pam_source = {
+                    pam_src = {
                         "index": row["Matched seq index"],
-                        "seq": row.get("Matched seq", ""),
+                        "seq":   row.get("Matched seq", ""),
                         "Transcript ID": row["Transcript ID"],
-                        "Gene Name": row["Gene Name"],
-                        "Strand": row.get("Strand", "."),
-                        "Biotype": row.get("Biotype"),
-                        "Regions": row.get("Regions", "."),
+                        "Gene Name":     row["Gene Name"],
+                        "Strand":        row.get("Strand", "."),
+                        "Biotype":       row.get("Biotype"),
+                        "Regions":       row.get("Regions", "."),
                     }
-                    bed_rows.append(create_pam_row(pam_source, extras_str))
+                    bed_rows.append(create_pam_row(pam_src, extra_map))
                 elif pd.notnull(row.get("First seq index")) and pd.notnull(row.get("Second seq index")):
                     for key, color, pre in [
-                            ("First seq", "0,0,255", "PAM 1:"), 
-                            ("Second seq", "0,255,0", "PAM 2:")
-                        ]:
-                        pam_source = {
+                        ("First seq",  "0,0,255",   "PAM 1:"),
+                        ("Second seq", "0,255,0",   "PAM 2:")
+                    ]:
+                        pam_src = {
                             "index": row[f"{key} index"],
-                            "seq": row.get(key, ""),
+                            "seq":   row.get(key, ""),
                             "Transcript ID": row["Transcript ID"],
-                            "Gene Name": row["Gene Name"],
-                            "Strand": row.get("Strand", "."),
-                            "Biotype": row.get("Biotype"),
-                            "Regions": row.get("Regions", "."),
+                            "Gene Name":     row["Gene Name"],
+                            "Strand":        row.get("Strand", "."),
+                            "Biotype":       row.get("Biotype"),
+                            "Regions":       row.get("Regions", "."),
                         }
-                        bed_rows.append(create_pam_row(pam_source, extras_str, color, prefix=pre))
+                        bed_rows.append(create_pam_row(pam_src, extra_map, color, prefix=pre))
 
-            bed_df = pd.DataFrame(bed_rows)
-            mask = bed_df["name"].str.startswith("Variant:")
-            variant_rows = bed_df[mask].drop_duplicates(subset=mandatory)
-            non_variant_rows = bed_df[~mask]
-            bed_df = pd.concat([variant_rows, non_variant_rows], ignore_index=True)
-
+            bed_df = pd.DataFrame(bed_rows)[header_cols]
             with open(output, "a") as f:
-                header_line = "# " + "\t".join(mandatory + ["extras"])
-                f.write(header_line + "\n")
-                for _, r in bed_df.iterrows():
-                    line = "\t".join(str(r[col]) for col in mandatory) + "\t" + str(r["extras"])
-                    f.write(line + "\n")
+                f.write("# " + "\t".join(header_cols) + "\n")
+                bed_df.to_csv(f, sep="\t", header=False, index=False)
 
         print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tResults saved in {output}.")
 
