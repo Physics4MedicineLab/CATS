@@ -10,6 +10,7 @@ from ttkbootstrap.constants import *
 from PIL import Image, ImageTk
 
 from cats import run_cats
+import converter
 
 class TextRedirector:
     def __init__(self, widget):
@@ -287,8 +288,10 @@ def main():
     input_frame = ttk.Frame(notebook)
     logging_frame = ttk.Frame(notebook)
     docs_frame = ttk.Frame(notebook)
+    converter_frame = ttk.Frame(notebook)
 
     notebook.add(input_frame, text=" CATS Input ")
+    notebook.add(converter_frame, text=" Converter ")
     notebook.add(logging_frame, text=" Logging ")
     notebook.add(docs_frame, text=" Docs ")
 
@@ -400,6 +403,78 @@ def main():
     docs_text.insert("end", "https://github.com/Physics4MedicineLab/CATS\n", "body")
 
     docs_text.configure(state="disabled")
+
+    converter_frame.grid_rowconfigure(0, weight=0)
+    converter_frame.grid_rowconfigure(1, weight=0)
+    converter_frame.grid_columnconfigure(1, weight=1)
+
+    conv_path_var   = ttk.StringVar()
+    conv_status_var = ttk.StringVar(value="")
+
+    def browse_conv_file():
+        filename = filedialog.askopenfilename(
+            filetypes=[("CATS csv / bed", "*.csv *.bed")]
+        )
+        if filename:
+            conv_path_var.set(filename)
+
+    def run_converter():
+        in_path = conv_path_var.get().strip()
+        if not in_path:
+            messagebox.showerror("Error", "Select a .csv or .bed file first.")
+            return
+
+        conv_button.config(state="disabled")
+        conv_status_var.set("Converting…")
+
+        def worker():
+            try:
+                saved_argv = sys.argv
+                sys.argv = ["converter.py", in_path]
+                converter.main()
+                root.after(
+                    0,
+                    lambda: messagebox.showinfo("Success", "Conversion completed!")
+                )
+            except SystemExit as e:
+                root.after(0, lambda: messagebox.showerror("Error", str(e)))
+            except Exception as e:
+                root.after(
+                    0,
+                    lambda: messagebox.showerror("Error", f"Conversion failed: {e}")
+                )
+            finally:
+                sys.argv = saved_argv
+                root.after(
+                    0,
+                    lambda: (
+                        conv_button.config(state="normal"),
+                        conv_status_var.set("")
+                    )
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    conv_label = ttk.Label(converter_frame, text="Input CSV / BED file:", font=font_large)
+    conv_label.grid(row=0, column=0, sticky="w", padx=5, pady=15)
+
+    conv_entry = ttk.Entry(converter_frame, textvariable=conv_path_var, font=font_large)
+    conv_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=15)
+
+    conv_browse = ttk.Button(
+        converter_frame, text="Browse", command=browse_conv_file, style='general.TButton'
+    )
+    conv_browse.grid(row=0, column=2, padx=5, pady=15)
+
+    conv_button = ttk.Button(
+        converter_frame, text="Convert", command=run_converter, style='run.TButton'
+    )
+    conv_button.grid(row=1, column=0, padx=5, pady=10)
+
+    conv_status = ttk.Label(
+        converter_frame, textvariable=conv_status_var, font=font_large, foreground="red"
+    )
+    conv_status.grid(row=1, column=1, sticky="w", padx=10, pady=10)
 
     for i in range(12):
         input_frame.grid_rowconfigure(i, weight=0)
