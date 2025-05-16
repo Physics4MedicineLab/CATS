@@ -36,6 +36,13 @@
 
 Install the latest [release](https://github.com/Physics4MedicineLab/CATS/releases), ensuring that you download the version compatible with your operating system.
 
+If the GUI fails to launch properly, you can try running it manually using the gui.py file located in the `gui` folder.
+Make sure all dependencies are installed, then run the following command (from inside the `CATS` directory):
+
+```bash
+python gui/gui.py
+```
+
 **NOTE for macOS users**:
 
 After downloading and unzipping the CATS folder, you may need to run the following command in your terminal to ensure the application runs correctly:
@@ -93,6 +100,14 @@ optional arguments:
   --variant-window VARIANT_WINDOW, -vw VARIANT_WINDOW
                         Maximum distance between the mutation and the found PAM sequence. Implies --pathogenicity.
 ```
+
+### CATS-converter
+The **CATS-converter** command-line tool allows you to convert files between _bed_ and _csv_ formats, without needing to rerun the main **CATS** workflow.
+
+```bash
+CATS-converter <path/to/file.(csv|bed)>
+```
+
 
 ### GUI Usage
 After installing the GUI version, simply navigate to the GUI folder and run the executable. Once launched, the following window will appear:
