@@ -12,6 +12,7 @@ setup(
     entry_points={
         "console_scripts": [
             "CATS = CATS.main:main",
+            "CATS-converter = gui.converter:main",
         ],
     },
 )
