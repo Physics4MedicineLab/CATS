@@ -142,9 +142,12 @@ def reverse_complement(seq):
     """
     return ''.join(IUPAC_COMPLEMENT[base] for base in reversed(seq.upper()))
 
-def keep_by_var_position(row):
+def keep_by_var_position(row, is_reverse_complement: bool):
     """
     In the final dataframe, keep only the rows with the variant before the PAM.
+
+    Uses XOR logic to determine position for reverse complement sequences and
+    strand orientation.
     """
     if row["Variant distance"] == 0:
         return True
@@ -160,12 +163,10 @@ def keep_by_var_position(row):
         pam2 = int(row["Second seq index"].split(":")[1])
         pam_ends = [pam1, pam2]
 
-    if row["Strand"] == "+":
-        return all(var_end <= pe for pe in pam_ends)
-    elif row["Strand"] == "-":
-        return all(var_start >= pe for pe in pam_ends)
-    else:
-        return False
+    use_var_end = (row["Strand"] == "+") ^ is_reverse_complement
+    var_pos = var_end if use_var_end else var_start
+
+    return all(var_pos <= pe if use_var_end else var_pos >= pe for pe in pam_ends)
 
 def create_pam_row(source, extra_map, color="0,0,255", prefix="PAM:"):
     """
@@ -355,7 +356,7 @@ def process_record_w_transcripts(args):
                                 abs(region_end - var_start),
                                 abs(region_start - var_stop),
                                 abs(region_end - var_stop),
-                            ]) + 1
+                            ])
 
                         if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                             variant_dict = base_dict.copy()
@@ -412,7 +413,7 @@ def process_record_w_transcripts(args):
                                     abs(region1_end - var_stop),
                                     abs(region2_start - var_stop),
                                     abs(region2_end - var_stop),
-                                ]) + 1
+                                ])
 
                             if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                                 variant_dict = base_dict.copy()
@@ -478,7 +479,7 @@ def process_record_w_transcripts_pc(args):
                                 abs(region_end - var_start),
                                 abs(region_start - var_stop),
                                 abs(region_end - var_stop),
-                            ]) + 1
+                            ])
 
                         if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                             variant_dict = base_dict.copy()
@@ -534,7 +535,7 @@ def process_record_w_transcripts_pc(args):
                                     abs(region1_end - var_stop),
                                     abs(region2_start - var_stop),
                                     abs(region2_end - var_stop),
-                                ]) + 1
+                                ])
 
                             if (var_start <= seq_region_end) and (var_stop >= seq_region_start):
                                 variant_dict = base_dict.copy()
@@ -941,7 +942,10 @@ def run_cats(fasta_file,
         if variant_window != num_bases:
             res = res[res["Variant distance"] <= variant_window]
         if pathogenic:
-            res = res[res.apply(keep_by_var_position, axis=1)]
+            if seq2:
+                res = res[res.apply(lambda row: keep_by_var_position(row, row["First seq index"] != seq1.upper()), axis=1)]
+            else:
+                res = res[res.apply(lambda row: keep_by_var_position(row, row["Matched seq index"] != seq1.upper()), axis=1)]
 
         os.makedirs(os.path.dirname(output), exist_ok=True)
         with open(output, 'w') as f:
@@ -994,27 +998,27 @@ def run_cats(fasta_file,
                 if pd.notnull(row.get("Matched seq index")):
                     pam_src = {
                         "index": row["Matched seq index"],
-                        "seq":   row.get("Matched seq", ""),
+                        "seq": row.get("Matched seq", ""),
                         "Transcript ID": row["Transcript ID"],
-                        "Gene Name":     row["Gene Name"],
-                        "Strand":        row.get("Strand", "."),
-                        "Biotype":       row.get("Biotype"),
-                        "Regions":       row.get("Regions", "."),
+                        "Gene Name": row["Gene Name"],
+                        "Strand": row.get("Strand", "."),
+                        "Biotype": row.get("Biotype"),
+                        "Regions": row.get("Regions", "."),
                     }
                     bed_rows.append(create_pam_row(pam_src, extra_map))
                 elif pd.notnull(row.get("First seq index")) and pd.notnull(row.get("Second seq index")):
                     for key, color, pre in [
-                        ("First seq",  "0,0,255",   "PAM 1:"),
-                        ("Second seq", "0,255,0",   "PAM 2:")
+                        ("First seq", "0,0,255", "PAM 1:"),
+                        ("Second seq", "0,255,0", "PAM 2:")
                     ]:
                         pam_src = {
                             "index": row[f"{key} index"],
-                            "seq":   row.get(key, ""),
+                            "seq": row.get(key, ""),
                             "Transcript ID": row["Transcript ID"],
-                            "Gene Name":     row["Gene Name"],
-                            "Strand":        row.get("Strand", "."),
-                            "Biotype":       row.get("Biotype"),
-                            "Regions":       row.get("Regions", "."),
+                            "Gene Name": row["Gene Name"],
+                            "Strand": row.get("Strand", "."),
+                            "Biotype": row.get("Biotype"),
+                            "Regions": row.get("Regions", "."),
                         }
                         bed_rows.append(create_pam_row(pam_src, extra_map, color, prefix=pre))
 
