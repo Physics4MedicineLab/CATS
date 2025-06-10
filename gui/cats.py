@@ -163,10 +163,9 @@ def keep_by_var_position(row, is_reverse_complement: bool):
         pam2 = int(row["Second seq index"].split(":")[1])
         pam_ends = [pam1, pam2]
 
-    use_var_end = (row["Strand"] == "+") ^ is_reverse_complement
-    var_pos = var_end if use_var_end else var_start
+    var_pos = var_end if is_reverse_complement else var_start
 
-    return all(var_pos <= pe if use_var_end else var_pos >= pe for pe in pam_ends)
+    return all(var_pos <= pe if is_reverse_complement else var_pos >= pe for pe in pam_ends)
 
 def create_pam_row(source, extra_map, color="0,0,255", prefix="PAM:"):
     """
@@ -333,7 +332,7 @@ def process_record_w_transcripts(args):
                 "Gene Name": transcript_parts[5],
                 "Biotype": '|'.join(transcript_parts[7:]),
                 "Strand": record_info["strand"],
-                "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
+                "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
                 "Matched seq": match.group(),
                 "Matched seq index": f"{record_info['chrom']}:{record_info['start'] + match.start()}"
             }
@@ -382,7 +381,7 @@ def process_record_w_transcripts(args):
                     "Gene Name": transcript_parts[5],
                     "Biotype": '|'.join(transcript_parts[7:]),
                     "Strand": record_info["strand"],
-                    "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
+                    "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
                     "First seq": idx1.group(),
                     "First seq index": f"{record_info['chrom']}:{record_info['start'] + idx1.start()}",
                     "Second seq": idx2.group(),
@@ -456,7 +455,7 @@ def process_record_w_transcripts_pc(args):
                 "Gene Name": transcript_parts[5],
                 "Regions": '|'.join(transcript_parts[7:]),
                 "Strand": record_info["strand"],
-                "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
+                "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
                 "Matched seq": match.group(),
                 "Matched seq index": f"{record_info['chrom']}:{record_info['start'] + match.start()}"
             }
@@ -504,7 +503,7 @@ def process_record_w_transcripts_pc(args):
                     "Gene Name": transcript_parts[5],
                     "Regions": '|'.join(transcript_parts[7:]),
                     "Strand": record_info["strand"],
-                    "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else str(record.seq),
+                    "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
                     "First seq": idx1.group(),
                     "First seq index": f"{record_info['chrom']}:{record_info['start'] + idx1.start()}",
                     "Second seq": idx2.group(),
