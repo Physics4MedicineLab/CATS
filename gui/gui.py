@@ -315,7 +315,7 @@ def main():
         "two distinct sequences of interest.\n\n", "body"
     )
 
-    docs_text.insert("end", "CATS Input tab Documentation:\n", "title")
+    docs_text.insert("end", "CATS Input tab:\n", "title")
     docs_text.insert("end", 
         "The CATS Input Tab is where you configure the parameters "
         "and settings for running CATS. Below are the main parameters.\n", "body"
@@ -399,6 +399,13 @@ def main():
         "After configuring the inputs, click the Run button. "
         "Monitor the process in the Logging tab.\n\n", "body"
     )
+
+    docs_text.insert("end", "CATS Converter tab:\n", "title")
+    docs_text.insert("end", 
+        "The CATS Converter Tab is where you you can convert files between "
+        "bed and csv formats, without needing to rerun the main CATS workflow\n\n", "body"
+    )
+
     docs_text.insert("end", "GiHub repository:  ", "body")
     docs_text.insert("end", "https://github.com/Physics4MedicineLab/CATS\n", "body")
 
