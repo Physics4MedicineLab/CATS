@@ -144,28 +144,27 @@ def reverse_complement(seq):
 
 def keep_by_var_position(row, is_reverse_complement: bool):
     """
-    In the final dataframe, keep only the rows with the variant before the PAM.
-
-    Uses XOR logic to determine position for reverse complement sequences and
-    strand orientation.
+    In the final dataframe, keep only the rows with the variant before the PAM
+    or after its reverse complement.
     """
     if row["Variant distance"] == 0:
         return True
 
-    chrom, rng = row["Variant position"].split(":")
-    var_start, var_end = map(int, rng.split("-"))
+    _, span = row["Variant position"].split(":")
+    var_start, var_end = map(int, span.split("-"))
 
     if pd.notnull(row.get("Matched seq index")):
-        pam_start = int(row["Matched seq index"].split(":")[1])
-        pam_ends  = [pam_start]
+        pam_starts = [int(row["Matched seq index"].split(":")[1])]
     else:
-        pam1 = int(row["First seq index"].split(":")[1])
-        pam2 = int(row["Second seq index"].split(":")[1])
-        pam_ends = [pam1, pam2]
+        pam_starts = [
+            int(row["First seq index"].split(":")[1]),
+            int(row["Second seq index"].split(":")[1]),
+        ]
 
-    var_pos = var_end if is_reverse_complement else var_start
-
-    return all(var_pos <= pe if is_reverse_complement else var_pos >= pe for pe in pam_ends)
+    if not is_reverse_complement:
+        return all(var_end <= ps for ps in pam_starts)
+    else:
+        return all(var_start >= ps for ps in pam_starts)
 
 def create_pam_row(source, extra_map, color="0,0,255", prefix="PAM:"):
     """
@@ -345,7 +344,7 @@ def process_record_w_transcripts(args):
                         seq_region_end = record_info['start'] + end_idx
 
                         region_start = record_info['start'] + match.start()
-                        region_end = region_start + len(match.group())
+                        region_end = region_start + len(match.group()) - 1
 
                         if var_start >= region_start and var_stop <= region_end:
                             var_distance = 0
@@ -396,9 +395,9 @@ def process_record_w_transcripts(args):
                             seq_region_end = record_info['start'] + end_idx
 
                             region1_start = record_info['start'] + idx1.start()
-                            region1_end = region1_start + len(idx1.group())
+                            region1_end = region1_start + len(idx1.group()) - 1
                             region2_start = record_info['start'] + idx2.start()
-                            region2_end = region2_start + len(idx2.group())
+                            region2_end = region2_start + len(idx2.group()) - 1
 
                             if (var_start >= region1_start and var_stop <= region1_end) or (var_start >= region2_start and var_stop <= region2_end):
                                 var_distance = 0
@@ -468,7 +467,7 @@ def process_record_w_transcripts_pc(args):
                         seq_region_end = record_info['start'] + end_idx
 
                         region_start = record_info['start'] + match.start()
-                        region_end = region_start + len(match.group())
+                        region_end = region_start + len(match.group()) - 1
 
                         if var_start >= region_start and var_stop <= region_end:
                             var_distance = 0
@@ -518,9 +517,9 @@ def process_record_w_transcripts_pc(args):
                             seq_region_end = record_info['start'] + end_idx
 
                             region1_start = record_info['start'] + idx1.start()
-                            region1_end = region1_start + len(idx1.group())
+                            region1_end = region1_start + len(idx1.group()) - 1
                             region2_start = record_info['start'] + idx2.start()
-                            region2_end = region2_start + len(idx2.group())
+                            region2_end = region2_start + len(idx2.group()) - 1
 
                             if (var_start >= region1_start and var_stop <= region1_end) or (var_start >= region2_start and var_stop <= region2_end):
                                 var_distance = 0
@@ -942,9 +941,13 @@ def run_cats(fasta_file,
             res = res[res["Variant distance"] <= variant_window]
         if pathogenic:
             if seq2:
-                res = res[res.apply(lambda row: keep_by_var_position(row, row["First seq index"] != seq1.upper()), axis=1)]
+                seq1_rc = reverse_complement(seq1) 
+                seq1_rc_pattern = re.compile(create_sequence_pattern(seq1_rc), re.IGNORECASE)
+                res = res[res.apply(lambda row: keep_by_var_position(row, bool(seq1_rc_pattern.search(row["First seq"]))), axis=1)]
             else:
-                res = res[res.apply(lambda row: keep_by_var_position(row, row["Matched seq index"] != seq1.upper()), axis=1)]
+                seq1_rc = reverse_complement(seq1) 
+                seq1_rc_pattern = re.compile(create_sequence_pattern(seq1_rc), re.IGNORECASE)
+                res = res[res.apply(lambda row: keep_by_var_position(row, bool(seq1_rc_pattern.search(row["Matched seq"]))), axis=1)]
 
         os.makedirs(os.path.dirname(output), exist_ok=True)
         with open(output, 'w') as f:
