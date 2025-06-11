@@ -406,7 +406,7 @@ def main():
         "bed and csv formats, without needing to rerun the main CATS workflow\n\n", "body"
     )
 
-    docs_text.insert("end", "GiHub repository:  ", "body")
+    docs_text.insert("end", "GitHub repository:  ", "body")
     docs_text.insert("end", "https://github.com/Physics4MedicineLab/CATS\n", "body")
 
     docs_text.configure(state="disabled")

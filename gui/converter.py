@@ -4,6 +4,10 @@ while preserving metadata and comments.
 """
 import os
 import sys
+from time import (
+    localtime,
+    strftime
+)
 from io import StringIO
 from typing import List, Tuple, Dict, Set, Union
 
@@ -297,7 +301,7 @@ def main() -> None:
         df_csv.drop_duplicates(inplace=True)
         df_csv.to_csv(out_path, mode="a", index=False)
 
-    print(f"\nCreated: {out_path}")
+    print(f"{strftime('%Y-%m-%d %H:%M:%S', localtime())}: INFO\tCONVERTER - File converted in: {out_path}")
 
 
 if __name__ == "__main__":
