@@ -154,17 +154,17 @@ def keep_by_var_position(row, is_reverse_complement: bool):
     var_start, var_end = map(int, span.split("-"))
 
     if pd.notnull(row.get("Matched seq index")):
-        pam_starts = [int(row["Matched seq index"].split(":")[1])]
+        pam_start = int(row["Matched seq index"].split(":")[1])
+        pam_ends  = [pam_start]
     else:
-        pam_starts = [
-            int(row["First seq index"].split(":")[1]),
-            int(row["Second seq index"].split(":")[1]),
-        ]
+        pam1 = int(row["First seq index"].split(":")[1])
+        pam2 = int(row["Second seq index"].split(":")[1])
+        pam_ends = [pam1, pam2]
 
-    if not is_reverse_complement:
-        return all(var_end <= ps for ps in pam_starts)
-    else:
-        return all(var_start >= ps for ps in pam_starts)
+    use_var_end = (row["Strand"] == "+") ^ is_reverse_complement
+    var_pos = var_end if use_var_end else var_start
+
+    return all(var_pos <= pe if use_var_end else var_pos >= pe for pe in pam_ends)
 
 def create_pam_row(source, extra_map, color="0,0,255", prefix="PAM:"):
     """
