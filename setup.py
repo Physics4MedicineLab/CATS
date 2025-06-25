@@ -5,7 +5,7 @@ from setuptools import (
 
 setup(
     name="CATS",
-    version="1.0.0",
+    version="0.1.0",
     packages=find_packages(),
     package_data={"CATS": ["../db/human/*", "../db/mouse/*"]},
     include_package_data=True,

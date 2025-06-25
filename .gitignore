@@ -186,3 +186,4 @@ db/mouse/*.db
 db/*.fa
 *.csv
 *.bed
+future_*

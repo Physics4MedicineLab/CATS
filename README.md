@@ -14,6 +14,9 @@
 2. [Usage](#usage)
    - [CLI usage](#cli-usage)
    - [GUI usage](#gui-usage)
+3. [Contributing](#contributing)
+4. [License](#license)
+5. [Citation](#citation)
 
 
 ## Installation
@@ -72,13 +75,12 @@ CATS --help
 ```
 
 which will show this message:
-```
-usage: CATS [-h] --fasta FASTA_FILE --seq1 SEQ1 [--seq2 SEQ2] --output OUTPUT [--window-size WINDOW_SIZE] [--num-bases NUM_BASES] [--gtf GTF_FILE] [--pathogenicity]
-            [--single-nucleotide-variant] [--gene-list GENE_LIST] [--variant-window VARIANT_WINDOW]
+```text
+usage: CATS [-h] --fasta FASTA_FILE --seq1 SEQ1 [--seq2 SEQ2] --output OUTPUT [--window-size WINDOW_SIZE] [--num-bases NUM_BASES] [--gtf GTF_FILE] [--pathogenicity] [--single-nucleotide-variant] [--gene-list GENE_LIST]          [--variant-window VARIANT_WINDOW]
 
 Parse a FASTA file and find sequences containing one (or two) specified sequences of interest.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --fasta FASTA_FILE, -f FASTA_FILE
                         Path to the FASTA file or use 'human', 'mouse', 'human_pc' or 'mouse_pc' keyword to access corresponding transcripts.
@@ -115,3 +117,10 @@ After installing the GUI version, simply navigate to the GUI folder and run the 
 <div align="center">
 <p><img src="docs/window.png" width="500" /></p>
 </div>
+
+A detailed documentation can be found in the fourth and last tab (`Docs`).
+
+
+## Contributing
+Pull requests, bug reports, and feature ideas are welcome: feel free to open a PR!
+
