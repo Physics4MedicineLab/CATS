@@ -305,7 +305,7 @@ def process_record_w_transcripts(args):
     """
     Worker function for parallel searches in parse_fasta() when transcripts exist.
     """
-    (record, seq1_pattern, seq2_pattern, transcripts,
+    (record, seq1, seq2, transcripts,
      pathogenic_variants, window_size, num_bases, 
      gene_list, single_seq) = args
 
@@ -315,6 +315,13 @@ def process_record_w_transcripts(args):
     if not record_info:
         return result
     seq = str(record.seq)[::-1] if record_info["strand"] == "-" else str(record.seq)
+
+    if record_info["strand"] == "-":
+        seq1 = seq1[::-1]
+        seq2 = seq2[::-1] if seq2 else None
+
+    seq1_pattern = create_sequence_pattern(seq1)
+    seq2_pattern = None if not seq2 else create_sequence_pattern(seq2)
     seq1_regex = re.compile(seq1_pattern, re.IGNORECASE)
 
     if gene_list and record_info['gene_name'] not in gene_list:
@@ -332,7 +339,7 @@ def process_record_w_transcripts(args):
                 "Biotype": '|'.join(transcript_parts[7:]),
                 "Strand": record_info["strand"],
                 "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
-                "Matched seq": match.group(),
+                "Matched seq": match.group()[::-1] if record_info["strand"] == "-" else match.group(),
                 "Matched seq index": f"{record_info['chrom']}:{record_info['start'] + match.start()}"
             }
             if not pathogenic_variants:
@@ -381,9 +388,9 @@ def process_record_w_transcripts(args):
                     "Biotype": '|'.join(transcript_parts[7:]),
                     "Strand": record_info["strand"],
                     "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
-                    "First seq": idx1.group(),
+                    "First seq": idx1.group()[::-1] if record_info["strand"] == "-" else idx1.group(),
                     "First seq index": f"{record_info['chrom']}:{record_info['start'] + idx1.start()}",
-                    "Second seq": idx2.group(),
+                    "Second seq": idx2.group()[::-1] if record_info["strand"] == "-" else idx2.group(),
                     "Second seq index": f"{record_info['chrom']}:{record_info['start'] + idx2.start()}"
                 }
                 if not pathogenic_variants:
@@ -429,7 +436,7 @@ def process_record_w_transcripts_pc(args):
     """
     Worker function for parallel searches in parse_fasta() for protein-coding transcripts.
     """
-    (record, seq1_pattern, seq2_pattern, transcripts,
+    (record, seq1, seq2, transcripts,
      pathogenic_variants, window_size, num_bases, 
      gene_list, single_seq) = args
 
@@ -439,6 +446,13 @@ def process_record_w_transcripts_pc(args):
     if not record_info:
         return result
     seq = str(record.seq)[::-1] if record_info["strand"] == "-" else str(record.seq)
+
+    if record_info["strand"] == "-":
+        seq1 = seq1[::-1]
+        seq2 = seq2[::-1] if seq2 else None
+
+    seq1_pattern = create_sequence_pattern(seq1)
+    seq2_pattern = None if not seq2 else create_sequence_pattern(seq2)
     seq1_regex = re.compile(seq1_pattern, re.IGNORECASE)
 
     if gene_list and record_info['gene_name'] not in gene_list:
@@ -455,7 +469,7 @@ def process_record_w_transcripts_pc(args):
                 "Regions": '|'.join(transcript_parts[7:]),
                 "Strand": record_info["strand"],
                 "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
-                "Matched seq": match.group(),
+                "Matched seq": match.group()[::-1] if record_info["strand"] == "-" else match.group(),
                 "Matched seq index": f"{record_info['chrom']}:{record_info['start'] + match.start()}"
             }
             if not pathogenic_variants:
@@ -503,9 +517,9 @@ def process_record_w_transcripts_pc(args):
                     "Regions": '|'.join(transcript_parts[7:]),
                     "Strand": record_info["strand"],
                     "Sequence": seq[start_idx:end_idx][::-1] if record_info["strand"] == "-" else seq[start_idx:end_idx],
-                    "First seq": idx1.group(),
+                    "First seq": idx1.group()[::-1] if record_info["strand"] == "-" else idx1.group(),
                     "First seq index": f"{record_info['chrom']}:{record_info['start'] + idx1.start()}",
-                    "Second seq": idx2.group(),
+                    "Second seq": idx2.group()[::-1] if record_info["strand"] == "-" else idx2.group(),
                     "Second seq index": f"{record_info['chrom']}:{record_info['start'] + idx2.start()}"
                 }
                 if not pathogenic_variants:
@@ -551,12 +565,15 @@ def process_record_no_transcripts(args):
     """
     Worker function for parallel searches in parse_fasta() when no transcripts exist.
     """
-    (record, seq1_pattern, seq2_pattern, transcripts,
+    (record, seq1, seq2, transcripts,
      pathogenic_variants, window_size, num_bases, 
      gene_list, single_seq) = args
 
     result = []
     seq = str(record.seq)
+
+    seq1_pattern = create_sequence_pattern(seq1)
+    seq2_pattern = None if not seq2 else create_sequence_pattern(seq2)
     seq1_regex = re.compile(seq1_pattern, re.IGNORECASE)
 
     if single_seq:
@@ -612,16 +629,11 @@ def parse_fasta(fasta_file: str,
         records = list(SeqIO.parse(handle, "fasta"))
 
     total = len(records)
-    seq1_pattern = create_sequence_pattern(seq1)
-    seq2_pattern = None if not seq2 else create_sequence_pattern(seq2)
 
     seq1_rc = reverse_complement(seq1)
     seq2_rc = reverse_complement(seq2) if seq2 else None
-
-    seq1_rc_pattern = create_sequence_pattern(seq1_rc)
-    seq2_rc_pattern = None if not seq2_rc else create_sequence_pattern(seq2_rc)
     
-    single_seq = (seq2_pattern is None or seq2_pattern.strip() == "")
+    single_seq = (seq2 is None or seq2.strip() == "")
 
     # Select the appropriate worker function
     if transcripts:
@@ -632,8 +644,8 @@ def parse_fasta(fasta_file: str,
     for i, record in enumerate(records):
         result.extend(process_record((
                     record,
-                    seq1_pattern,
-                    seq2_pattern,
+                    seq1,
+                    seq2,
                     transcripts,
                     pathogenic_variants,
                     window_size,
@@ -644,8 +656,8 @@ def parse_fasta(fasta_file: str,
         # run also the reverse complement(s)
         result.extend(process_record((
                     record,
-                    seq1_rc_pattern,
-                    seq2_rc_pattern,
+                    seq1_rc,
+                    seq2_rc,
                     transcripts,
                     pathogenic_variants,
                     window_size,
