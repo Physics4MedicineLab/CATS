@@ -18,6 +18,8 @@ from Bio.Seq import Seq
 from tqdm import tqdm
 from parsley import makeGrammar
 
+from CATS import __version__
+
 # Mapping of IUPAC notation to regex pattern
 IUPAC_MAP = {
     "W": "[AT]",
@@ -1071,6 +1073,8 @@ def main():
                               "OR a semicolon-separated list of gene names (e.g. 'HBB;HTT')."))
     parser.add_argument("--variant-window", "-vw", dest="variant_window", required=False, type=int,
                         help="Maximum distance between the mutation and the found PAM sequence. Implies --pathogenicity.")
+    parser.add_argument("--version", "-V", action="version", version=f"CATS v{__version__}",
+                        help="Show program's version number.")
     args = parser.parse_args()
 
     run_cats(

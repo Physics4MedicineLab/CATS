@@ -3,9 +3,11 @@ from setuptools import (
     find_packages
 )
 
+from CATS import __version__
+
 setup(
     name="CATS",
-    version="0.1.0",
+    version=__version__,
     packages=find_packages(),
     package_data={"CATS": ["../db/human/*", "../db/mouse/*"]},
     include_package_data=True,
