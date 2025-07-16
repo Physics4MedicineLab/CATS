@@ -19,7 +19,7 @@
 5. [Citation](#citation)
 
 
-## Installation
+## 🚀 Installation
 
 ### CLI installation
 
@@ -62,7 +62,7 @@ Replace `<dir>` with the full path to the directory containing the unzipped CATS
 Only run this command **once**, _after_ you have downloaded and unzipped the folder and _before_ launching the GUI.
 
 
-## Usage
+## 💡 Usage
 
 Once installed, you can either use the **CLI** or launch the **GUI**.
 
@@ -121,6 +121,9 @@ After installing the GUI version, simply navigate to the GUI folder and run the 
 A detailed documentation can be found in the fourth and last tab (`Docs`).
 
 
-## Contributing
+## 🤝 Contributing
 Pull requests, bug reports, and feature ideas are welcome: feel free to open a PR!
 
+
+## 📝 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
