@@ -1,35 +1,39 @@
 # **C**omparing Cas **A**ctivities by **T**arget **S**uperimposition (**CATS**)
-**CATS** is a bioinformatic tool designed to find genomic regions nearby two distinct sequences of interest. It offers both a command-line interface (CLI) and a graphical user interface (GUI) to cater to different usage preferences.
 
 <div align="center">
 <p><img src="docs/logo.png" width="300" /></p>
 </div>
 
+**CATS** is a bioinformatic tool designed to automate the detection of overlapping PAM sequences and identify allele-specific targets resulting from pathogenic mutations. It offers both a command-line interface (CLI) and a graphical user interface (GUI) to cater to different usage preferences.
+For further details, see the associated publication: [*CATS: A Bioinformatic Tool for Automated Cas9 Nucleases activity comparison in clinically relevant contexts*](https://doi.org/10.3389/fgeed.2025.1571023).
+
 
 ## Table of Contents
 
-1. [Installation](#installation)  
-   - [CLI installation](#cli-installation)  
-   - [GUI installation](#gui-installation)
+1. [Installation](#installation)
+   * [CLI installation](#cli-installation)
+   * [GUI installation](#gui-installation)
 2. [Usage](#usage)
-   - [CLI usage](#cli-usage)
-   - [GUI usage](#gui-usage)
+   * [CLI usage](#cli-usage)
+   * [GUI usage](#gui-usage)
 3. [Contributing](#contributing)
 4. [License](#license)
 5. [Citation](#citation)
 
 
-## 🚀 Installation
+## Installation
 
 ### CLI installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/Physics4MedicineLab/CATS.git
    cd CATS
    ```
 
 2. Install **CATS**:
+
    ```bash
    pip install -r requirements.txt
    pip install .
@@ -53,16 +57,18 @@ After downloading and unzipping the CATS folder, you may need to run the followi
 ```bash
 xattr -dr com.apple.quarantine <dir>/CATS/
 ```
+
 or
+
 ```bash
 find <dir>/CATS/ -exec xattr -d com.apple.quarantine {} \;
 ```
+
 Replace `<dir>` with the full path to the directory containing the unzipped CATS folder.
 
-Only run this command **once**, _after_ you have downloaded and unzipped the folder and _before_ launching the GUI.
+Only run this command **once**, *after* you have downloaded and unzipped the folder and *before* launching the GUI.
 
-
-## 💡 Usage
+## Usage
 
 Once installed, you can either use the **CLI** or launch the **GUI**.
 
@@ -75,6 +81,7 @@ CATS --help
 ```
 
 which will show this message:
+
 ```text
 usage: CATS [-h] --fasta FASTA_FILE --seq1 SEQ1 [--seq2 SEQ2] --output OUTPUT [--window-size WINDOW_SIZE] [--num-bases NUM_BASES] [--gtf GTF_FILE] [--pathogenicity] [--single-nucleotide-variant] [--gene-list GENE_LIST]          [--variant-window VARIANT_WINDOW]
 
@@ -104,7 +111,8 @@ options:
 ```
 
 ### CATS-converter
-The **CATS-converter** command-line tool allows you to convert files between _bed_ and _csv_ formats, without needing to rerun the main **CATS** workflow.
+
+The **CATS-converter** command-line tool allows you to convert files between *bed* and *csv* formats, without needing to rerun the main **CATS** workflow.
 
 ```bash
 CATS-converter <path/to/file.(csv|bed)>
@@ -120,10 +128,30 @@ After installing the GUI version, simply navigate to the GUI folder and run the 
 
 A detailed documentation can be found in the fourth and last tab (`Docs`).
 
+For further reference, consult the publication: [*CATS: A Bioinformatic Tool for Automated Cas9 Nucleases activity comparison in clinically relevant contexts*](https://doi.org/10.3389/fgeed.2025.1571023).
 
-## 🤝 Contributing
+## Contributing
 Pull requests, bug reports, and feature ideas are welcome: feel free to open a PR!
 
 
-## 📝 License
+## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
+## Citation
+
+Please cite our work if you use **CATS** in your research:
+
+```bibtex
+@article{Rocchi2025CATS,
+  author = {Rocchi, Ettore and Magnani, Federico and Castellani, Gastone and Carusillo, Antonio and Tarozzi, Martina},
+  title = {{CATS}: A Bioinformatic Tool for Automated Cas9 Nucleases Activity Comparison in Clinically Relevant Contexts},
+  journal = {Frontiers in Genome Editing},
+  volume = {7},
+  number = {Tools and Mechanisms},
+  pages = {1571023},
+  year = {2025},
+  doi = {10.3389/fgeed.2025.1571023},
+  url = {https://doi.org/10.3389/fgeed.2025.1571023}
+}
+```
