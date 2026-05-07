@@ -2,6 +2,12 @@
 
 <div align="center">
 <p><img src="docs/logo.png" width="300" /></p>
+
+[![PyPI version](https://img.shields.io/pypi/v/crispr-cats.svg)](https://pypi.org/project/crispr-cats/)
+[![Python versions](https://img.shields.io/pypi/pyversions/crispr-cats.svg)](https://pypi.org/project/crispr-cats/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DOI](https://img.shields.io/badge/DOI-10.3389%2Ffgeed.2025.1571023-blue)](https://doi.org/10.3389/fgeed.2025.1571023)
+
 </div>
 
 **CATS** is a bioinformatic tool designed to automate the detection of overlapping PAM sequences and identify allele-specific targets resulting from pathogenic mutations. It offers both a command-line interface (CLI) and a graphical user interface (GUI) to cater to different usage preferences.
@@ -25,32 +31,30 @@ For further details, see the associated publication: [*CATS: A Bioinformatic Too
 
 ### CLI installation
 
-1. Clone the repository:
+**CATS** is published on [PyPI](https://pypi.org/project/crispr-cats/). Install it with `pip`:
 
-   ```bash
-   git clone https://github.com/Physics4MedicineLab/CATS.git
-   cd CATS
-   ```
+```bash
+pip install crispr-cats
+```
 
-2. Install **CATS**:
+This installs the `CATS` and `CATS-converter` commands. To also install the GUI (`CATS-gui` command), include the `[gui]` extra:
 
-   ```bash
-   pip install -r requirements.txt
-   pip install .
-   ```
+```bash
+pip install 'crispr-cats[gui]'
+```
 
 ### GUI installation
 
-Install the latest [release](https://github.com/Physics4MedicineLab/CATS/releases), ensuring that you download the version compatible with your operating system.
-
-If the GUI fails to launch properly, you can try running it manually using the gui.py file located in the `gui` folder.
-Make sure all dependencies are installed, then run the following command (from inside the `CATS` directory):
+Install the GUI extra and launch the graphical interface with:
 
 ```bash
-python gui/gui.py
+pip install 'crispr-cats[gui]'
+CATS-gui
 ```
 
-**NOTE for macOS users**:
+Pre-built standalone bundles are also available on the [releases page](https://github.com/Physics4MedicineLab/CATS/releases).
+
+**NOTE for macOS users (standalone bundle only)**:
 
 After downloading and unzipping the CATS folder, you may need to run the following command in your terminal to ensure the application runs correctly:
 
@@ -120,7 +124,7 @@ CATS-converter <path/to/file.(csv|bed)>
 
 
 ### GUI Usage
-After installing the GUI version, simply navigate to the GUI folder and run the executable. Once launched, the following window will appear:
+Run `CATS-gui` from your terminal (or launch the executable from the standalone bundle). Once launched, the following window will appear:
 
 <div align="center">
 <p><img src="docs/window.png" width="500" /></p>

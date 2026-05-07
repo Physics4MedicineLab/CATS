@@ -2,6 +2,7 @@
 Convert between CATS CSV files and BED files
 while preserving metadata and comments.
 """
+import argparse
 import os
 import sys
 from time import (
@@ -269,10 +270,18 @@ def _write_comments(fh, comments: List[str], to_csv: bool = False) -> None:
         fh.write(ln + end_char)
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        sys.exit("Usage: python converter.py <file.(csv|bed)>")
+    parser = argparse.ArgumentParser(
+        prog="CATS-converter",
+        description="Convert CATS output between CSV and BED formats, preserving metadata and comments.",
+    )
+    parser.add_argument(
+        "input",
+        metavar="FILE",
+        help="Path to a .csv or .bed file. The output file is written next to the input with the swapped extension.",
+    )
+    args = parser.parse_args()
 
-    in_path = os.path.abspath(sys.argv[1])
+    in_path = os.path.abspath(args.input)
     if not os.path.isfile(in_path):
         sys.exit(f"File not found: {in_path}")
 

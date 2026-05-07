@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crispr-cats"
+dynamic = ["version"]
+description = "Comparing Cas Activities by Target Superimposition - find genomic regions nearby two distinct sequences of interest."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Ettore Rocchi", email = "ettore.rocchi3@unibo.it" },
+    { name = "Martina Tarozzi", email = "martina.tarozzi3@unibo.it" },
+]
+keywords = ["bioinformatics", "CRISPR", "Cas", "genomics", "PAM"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pandas",
+    "biopython",
+    "gffutils",
+    "requests",
+    "numpy",
+    "tqdm",
+    "openpyxl",
+    "Parsley",
+]
+
+[project.optional-dependencies]
+gui = [
+    "ttkbootstrap",
+    "screeninfo",
+    "pillow",
+]
+dev = [
+    "build",
+    "twine",
+    "pytest",
+]
+
+[project.urls]
+Homepage = "https://github.com/Physics4MedicineLab/CATS"
+Repository = "https://github.com/Physics4MedicineLab/CATS"
+Issues = "https://github.com/Physics4MedicineLab/CATS/issues"
+
+[project.scripts]
+CATS = "CATS.main:main"
+CATS-converter = "gui.converter:main"
+CATS-gui = "gui.gui:main"
+
+[tool.setuptools]
+packages = ["CATS", "gui"]
+
+[tool.setuptools.dynamic]
+version = { attr = "CATS.__version__" }
+
+[tool.setuptools.package-data]
+gui = ["logo.png"]

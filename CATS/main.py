@@ -615,10 +615,12 @@ def parse_fasta(fasta_file: str,
                 window_size: int,
                 num_bases: int,
                 gene_list: Union[set, None],
-                is_pc: bool) -> list:
+                is_pc: bool,
+                progress_callback=None) -> list:
     """
     Parse the (possibly gzipped) FASTA and search for matches.
-    A progress bar is displayed to report the status.
+    A progress bar is displayed to report the status, unless a
+    ``progress_callback(current, total)`` is provided (e.g. from the GUI).
     """
     result = []
     if pathogenic_variants == {}:
@@ -629,9 +631,11 @@ def parse_fasta(fasta_file: str,
     with open_func(fasta_file, "rt") as handle:
         records = list(SeqIO.parse(handle, "fasta"))
 
+    total = len(records)
+
     seq1_rc = reverse_complement(seq1)
     seq2_rc = reverse_complement(seq2) if seq2 else None
-    
+
     single_seq = (seq2 is None or seq2.strip() == "")
 
     # Select the appropriate worker function
@@ -640,7 +644,8 @@ def parse_fasta(fasta_file: str,
     else:
         process_record = process_record_no_transcripts
 
-    for record in tqdm(records, desc="Parsing records"):
+    records_iter = records if progress_callback else tqdm(records, desc="Parsing records")
+    for i, record in enumerate(records_iter):
         result.extend(process_record((
                     record,
                     seq1,
@@ -664,6 +669,8 @@ def parse_fasta(fasta_file: str,
                     gene_list,
                     single_seq
                 )))
+        if progress_callback:
+            progress_callback(i + 1, total)
 
     return result
 
@@ -748,7 +755,8 @@ def run_cats(fasta_file,
              pathogenicity=False,
              snv=False,
              gene_list=None,
-             variant_window=None):
+             variant_window=None,
+             progress_callback=None):
     """
     Main analysis function.
     """
@@ -934,7 +942,8 @@ def run_cats(fasta_file,
         window_size=window_size,
         num_bases=num_bases,
         gene_list=gene_list,
-        is_pc=is_pc
+        is_pc=is_pc,
+        progress_callback=progress_callback,
     )
 
     if not result_sequences:

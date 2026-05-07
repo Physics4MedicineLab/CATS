@@ -5,12 +5,18 @@ import threading
 import platform
 from tkinter import filedialog, messagebox
 
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
-from PIL import Image, ImageTk
+try:
+    import ttkbootstrap as ttk
+    from ttkbootstrap.constants import *
+    from PIL import Image, ImageTk
+except ImportError as e:
+    raise SystemExit(
+        "CATS-gui requires the optional GUI dependencies. "
+        "Install them with:  pip install 'crispr-cats[gui]'"
+    ) from e
 
-from cats import run_cats
-import converter
+from CATS.main import run_cats
+from gui import converter
 
 class TextRedirector:
     def __init__(self, widget):
