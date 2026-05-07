@@ -4,7 +4,7 @@
 <p><img src="docs/logo.png" width="300" /></p>
 
 [![PyPI version](https://img.shields.io/pypi/v/crispr-cats.svg)](https://pypi.org/project/crispr-cats/)
-[![Python versions](https://img.shields.io/pypi/pyversions/crispr-cats.svg)](https://pypi.org/project/crispr-cats/)
+[![Python versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://pypi.org/project/crispr-cats/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![DOI](https://img.shields.io/badge/DOI-10.3389%2Ffgeed.2025.1571023-blue)](https://doi.org/10.3389/fgeed.2025.1571023)
 
